@@ -371,7 +371,7 @@ function CombinedErrorWarningIcon({ error, warning }: { error?: string | string[
       ref={containerRef}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      style={{ position: 'relative', cursor: 'help', display: 'flex', alignItems: 'center', gap: 8 }}
+      style={{ position: 'relative', cursor: 'help', display: 'inline-flex', alignItems: 'center', gap: 8 }}
     >
       {/* Error section */}
       {hasErrors && (
