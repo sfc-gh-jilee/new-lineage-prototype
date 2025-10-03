@@ -1,7 +1,5 @@
-/* Import design system tokens */
-/* @import './design-tokens.css'; */ /* Temporarily disabled - import may be causing issues */
-
-/* Legacy Design tokens - will be removed after migration */
+/* Design System Tokens
+   Centralized design values for consistent theming and easy maintenance */
 :root {
   --border-radius-rg: 8px;
   --border-radius-lg: 12px;
@@ -54,6 +52,108 @@
   --z-dropdown: 1000;
   --z-max: 9999;
 }
+
+/* =============================================================================
+   UTILITY CLASSES FOR COMPONENTS
+   Replace inline styles with these token-based classes
+   ============================================================================= */
+
+/* Popover Utilities */
+.popover-base {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: var(--space-2);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  box-shadow: var(--shadow);
+  min-width: 200px;
+  max-width: 250px;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  pointer-events: none;
+  z-index: var(--z-max);
+}
+
+.popover-data-quality {
+  background: var(--bg-primary);
+  box-shadow: 0 4px 16px rgba(25, 30, 36, 0.2);
+}
+
+.popover-error {
+  background: var(--bg-primary);
+  border: 1px solid var(--red-200);
+}
+
+.popover-warning {
+  background: var(--bg-primary);
+  border: 1px solid var(--yellow-200);
+}
+
+/* Interactive Element Utilities */
+.interactive-help {
+  position: relative;
+  cursor: help;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-center-gap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Text Utilities */
+.text-primary {
+  color: var(--text-primary);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-error {
+  color: var(--red-700);
+}
+
+.text-warning {
+  color: var(--yellow-800);
+}
+
+/* Background Utilities */
+.bg-primary {
+  background-color: var(--bg-primary);
+}
+
+.bg-secondary {
+  background-color: var(--bg-secondary);
+}
+
+/* Spacing Utilities */
+.mt-1 { margin-top: var(--space-1); }
+.mt-2 { margin-top: var(--space-2); }
+.mt-3 { margin-top: var(--space-3); }
+.mb-1 { margin-bottom: var(--space-1); }
+.mb-2 { margin-bottom: var(--space-2); }
+.mb-3 { margin-bottom: var(--space-3); }
+.p-1 { padding: var(--space-1); }
+.p-2 { padding: var(--space-2); }
+.p-3 { padding: var(--space-3); }
+.gap-1 { gap: var(--space-1); }
+.gap-2 { gap: var(--space-2); }
+.gap-3 { gap: var(--space-3); }
+
+/* Border Radius Utilities */
+.rounded-sm { border-radius: var(--radius-md); }
+.rounded { border-radius: var(--radius-lg); }
+.rounded-lg { border-radius: var(--radius-xl); }
 
 body {
   margin: 0;

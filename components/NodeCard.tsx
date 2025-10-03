@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Handle, Position } from 'reactflow';
 import type { ObjType, ColumnMetadata } from '../lib/types';
 import { colors, nodeCard } from '../styles';
+import { tokens } from '../lib/tokens';
 
 export type NodeCardData = {
   id: string;
@@ -294,31 +295,15 @@ function DataQualityRating({ score }: { score: number }) {
       {/* Popover */}
       {showPopover && (
         <div
-          className="data-quality-popover"
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            marginTop: 8,
-            background: '#fbfbfb',
-            borderRadius: 6,
-            padding: 12,
-            boxShadow: '0 4px 16px rgba(25, 30, 36, 0.2)',
-            minWidth: 200,
-            maxWidth: 250,
-            fontSize: 12,
-            lineHeight: 1.5,
-            pointerEvents: 'none',
-          }}
+          className="data-quality-popover popover-base popover-data-quality"
         >
-          <div style={{ fontWeight: 600, marginBottom: 4, color: '#1e252f' }}>
+          <div style={{ fontWeight: 600, marginBottom: tokens.spacing.xs, color: tokens.colors.text }}>
             Data Quality: {getQualityLabel(score)}
           </div>
-          <div style={{ color: '#1e252f', marginBottom: 8 }}>
+          <div style={{ color: tokens.colors.text, marginBottom: tokens.spacing.sm }}>
             Score: {score.toFixed(1)} / 5.0
           </div>
-          <div style={{ color: '#1e252f', lineHeight: 1.4 }}>
+          <div style={{ color: tokens.colors.text, lineHeight: 1.4 }}>
             {getQualityDescription(score)}
           </div>
 
