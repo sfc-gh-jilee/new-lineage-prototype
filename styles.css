@@ -693,7 +693,7 @@ body {
   font-weight: 600;
   text-transform: uppercase;
   color: #64748b;
-  margin: 0 -8px 4px;
+  margin: 0 -8px 6px;
 }
 
 .children-header-title {
@@ -904,7 +904,7 @@ hr {
   max-height: 206px;
   overflow-y: auto;
   overflow-x: hidden;
-  margin: 0 -12px 0;
+  margin: 0 -8px 0;
 }
 
 /* Resize handle for children list */
@@ -958,7 +958,7 @@ hr {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 4px 12px;
+  padding: 4px 8px;
   font-size: 12px;
   cursor: pointer;
   /* transition: background-color 150ms ease-out; */

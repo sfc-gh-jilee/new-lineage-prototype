@@ -920,7 +920,7 @@ export function NodeCard({ data }: { data: NodeCardData }) {
         <div className="node-card-children">
           <div className="children-header">
             <div className="children-search-container">
-              <svg className="children-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="children-search-icon" width="16" height="16" viewBox="-2 -2 28 28" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8"></circle>
                 <path d="m21 21-4.35-4.35"></path>
               </svg>
