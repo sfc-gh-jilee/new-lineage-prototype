@@ -1,0 +1,883 @@
+/* Design tokens */
+:root {
+  --border-radius-rg: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-xl: 16px;
+  --card-width: 280px;
+  --card-min-height: 84px;
+  --spacing-xs: 4px;
+  --spacing-sm: 6px;
+  --spacing-md: 8px;
+  --spacing-lg: 12px;
+  --spacing-xl: 16px;
+  --spacing-2xl: 20px;
+  --divider: #e5e7eb;
+  --text-secondary: #5d6a85;
+  --text-primary: #1e252f;
+  --bg-panel: #ffffff;
+  --border-color: #d5dae4;
+  --border-hover: #9FABC1;
+  --border-active: #1A6CE7;
+  --level2-background-color: #fbfbfb;
+  --background-hover: rgba(0, 0, 0, .04);
+  --shadow: 0 2px 8px 0 rgba(25, 30, 36, 0.15);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/* Container styles */
+.container-root {
+  width: 100%;
+  height: 100vh;
+  background-color: var(--bg-panel);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Node card styles */
+.node-card-base {
+  position: relative;
+  border-radius: var(--border-radius-rg);
+  border: 1px solid var(--border-color);
+  /* box-shadow: var(--shadow); */
+  padding: var(--spacing-xl);
+  width: var(--card-width);
+  /* min-height: var(--card-min-height); */
+  cursor: pointer;
+  user-select: none;
+  /* background-color: #f8fafc; */
+  background-color: var(--level2-background-color);
+  box-sizing: border-box;
+}
+
+.node-card-base:hover {
+  border-color: var(--border-hover);
+  /* box-shadow: var(--shadow); */
+}
+
+.node-card-base.selected {
+  border-color: var(--border-active);
+  border-width: 2px;
+  /* box-shadow: 0 0 0 3px rgba(26, 108, 231, 0.1), 0 4px 12px rgba(0,0,0,0.15); */
+  padding: calc(var(--spacing-xl) - 1px);
+}
+.node-card-base.selected .node-card-type {
+  top: -25px;
+  left: -1px;
+}
+
+.node-card-base.selected:hover {
+  border-color: var(--border-active);
+  /* box-shadow: 0 0 0 3px rgba(26, 108, 231, 0.15), 0 4px 12px rgba(0,0,0,0.15), 0 8px 24px rgba(0,0,0,0.1); */
+}
+
+/* Column selected nodes - bring to top */
+.node-card-base.column-selected {
+  position: relative;
+  z-index: 1000; /* High z-index to bring to top */
+  box-shadow: 0 0 0 1px #D6E6FF;
+}
+
+.node-card-base.column-selected:hover {
+  box-shadow: 0 0 0 2px #D6E6FF;
+}
+
+.node-card-header {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 16px;
+  /* margin-bottom: var(--spacing-sm); */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.node-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+}
+
+.node-card-header {
+  display: flex;
+  gap: 16px;
+  flex-direction: row;
+}
+
+.node-card-top {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.node-card-label {
+  color: var(--text-primary);
+  font-weight: 500;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  line-height: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.node-card-actions {
+  position: absolute;
+  top: 0;
+  right: -24px;
+  left: -24px;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 200ms ease-in-out, visibility 200ms ease-in-out;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.node-card-base:hover .node-card-actions {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 200ms ease-in-out, visibility 200ms ease-in-out;
+  transition-delay: 0ms;
+  pointer-events: auto;
+}
+
+/* Hide actions with delay when not hovering */
+.node-card-base:not(:hover) .node-card-actions {
+  transition-delay: 400ms;
+}
+
+.node-card-top {
+  display: flex;
+  gap: 4px;
+}
+
+/* Individual button animations */
+.node-card-actions .nc-button {
+  transform: translateX(0);
+  transition: all 0.12s ease, transform 200ms ease-out;
+  opacity: 0;
+  top: 26px;
+  margin-top: -12px;
+}
+
+.node-card-base:hover .node-card-actions .nc-button:nth-child(1) {
+  transform: translateX(-8px);
+  transition-delay: 100ms;
+  opacity: 1;
+}
+
+.node-card-base:hover .node-card-actions .nc-button:nth-child(2) {
+  transform: translateX(8px);
+  transition-delay: 100ms;
+  opacity: 1;
+}
+
+/* Reset transforms when not hovering */
+.node-card-base:not(:hover) .node-card-actions .nc-button {
+  transform: translateX(0);
+  transition-delay: 0ms;
+  opacity: 0;
+}
+
+/* Color variants */
+/* .node-card-table {
+}
+
+.node-card-view {
+} */
+
+.node-card-stage {
+  background-color: #fffbeb;
+  border-color: #fcd34d;
+}
+
+.node-card-dataset {
+  background-color: #f5f3ff;
+  border-color: #c4b5fd;
+}
+
+.node-card-model {
+  background-color: #fff1f2;
+  border-color: #fda4af;
+}
+
+.node-card-external {
+}
+
+.node-card-default {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+/* ReactFlow Handle Customization */
+.react-flow__handle {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 50% !important;
+  top: 26px !important;
+}
+
+.react-flow__handle-top {
+  top: -3px !important;
+}
+
+.react-flow__handle-bottom {
+  bottom: -3px !important;
+}
+
+.react-flow__handle-left {
+  left: -3px !important;
+}
+
+.react-flow__handle-right {
+  right: -3px !important;
+}
+
+/* ReactFlow Edge Customization */
+.react-flow__edge-path {
+  stroke: var(--border-hover) !important;
+  stroke-width: 1px !important;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--border-active) !important;
+  stroke-width: 2px !important;
+}
+
+/* ReactFlow Controls Customization */
+.react-flow__controls {
+  background: var(--level2-background-color) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+  overflow: hidden;
+}
+
+.react-flow__controls-button {
+  background: var(--level2-background-color) !important;
+  border: var(--border-color) !important;
+  color: var(--text-primary) !important;
+  width: 32px;
+  height:32px;
+}
+
+.react-flow__controls-button:hover {
+  border-color: var(--border-hover) !important;
+}
+
+/* ReactFlow MiniMap Customization */
+.react-flow__minimap {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+}
+
+/* ReactFlow Background Customization */
+.react-flow__background {
+  background-color: #f8fafc !important;
+}
+
+.react-flow__background-pattern {
+  stroke: #e2e8f0 !important;
+  stroke-width: 1px !important;
+}
+
+/* ===== BUTTON SYSTEM ===== */
+
+/* ReactFlow Level Buttons (Canvas/Layout controls) */
+.rf-button {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+  outline: none;
+  user-select: none;
+}
+
+.rf-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ReactFlow Button Variants */
+.rf-button-primary {
+  background-color: #1A6CE7;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.rf-button-primary:hover:not(:disabled) {
+  background-color: #2563eb;
+  border-color: #2563eb;
+}
+
+.rf-button-secondary {
+  background-color: var(--level2-background-color);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.rf-button-secondary:hover:not(:disabled) {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.rf-button-icon {
+  background-color: white;
+  color: #6b7280;
+  border-color: #e2e8f0;
+  padding: 8px;
+  min-width: 36px;
+  min-height: 36px;
+}
+
+.rf-button-icon:hover:not(:disabled) {
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+/* ReactFlow Button Sizes */
+.rf-button-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+  min-height: 28px;
+}
+
+.rf-button-md {
+  padding: 0 12px;
+  font-size: 14px;
+  min-height: 32px;
+}
+
+.rf-button-lg {
+  padding: 10px 20px;
+  font-size: 16px;
+  min-height: 44px;
+}
+
+.rf-button-icon.rf-button-sm {
+  padding: 4px;
+  min-width: 28px;
+  min-height: 28px;
+}
+
+.rf-button-icon.rf-button-lg {
+  padding: 12px;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* NodeCard Level Buttons (Node controls) */
+.nc-button {
+  background-color: var(--level2-background-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 500;
+  transition: all 0.12s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-decoration: none;
+  outline: none;
+  user-select: none;
+  position: relative;
+  height: 24px;
+  padding: 12px 0;
+}
+
+.nc-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* NodeCard Button Variants */
+.nc-button-primary {
+  background-color: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.nc-button-primary:hover:not(:disabled) {
+  background-color: #2563eb;
+  border-color: #2563eb;
+}
+
+.nc-button-secondary {
+  background-color: var(--level2-background-color);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.nc-button-secondary:hover:not(:disabled) {
+  background-color: var(--background-hover);
+  border-color: var(--border-hover);
+}
+
+.nc-button-icon {
+  color: var(--text-secondary);
+  width: 24px !important;
+  height: 24px !important;
+  color: var(--text-primary);
+}
+
+.nc-button-icon:hover:not(:disabled) {
+  border-color: var(--border-hover);
+}
+
+/* NodeCard Button Sizes */
+.nc-button-sm {
+  padding: 0 12px;
+  font-size: 11px;
+  min-height: 24px;
+}
+
+.nc-button-md {
+  padding: 6px 12px;
+  font-size: 12px;
+  min-height: 28px;
+}
+
+.nc-button-lg {
+  padding: 8px 16px;
+  font-size: 13px;
+  min-height: 32px;
+}
+
+.nc-button-icon.nc-button-sm {
+  padding: 2px;
+  min-width: 20px;
+  min-height: 20px;
+}
+
+.nc-button-icon.nc-button-lg {
+  padding: 6px;
+  min-width: 32px;
+  min-height: 32px;
+}
+
+/* ===== END BUTTON SYSTEM ===== */
+
+/* Custom IconButton Styles */
+.icon-button {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 8px;
+  transition: all 0.2s ease;
+  background-color: var(--level2-background-color);
+  color: var(--text-primary);
+  min-width: 32px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-button:hover {
+  border-color: var(--border-hover);
+}
+
+.icon-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* IconButton Variants */
+.icon-button-primary {
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+  color: #ffffff;
+}
+
+.icon-button-primary:hover {
+  background-color: #2563eb;
+  border-color: #2563eb;
+}
+
+.icon-button-success {
+  background-color: #10b981;
+  border-color: #10b981;
+  color: #ffffff;
+}
+
+.icon-button-success:hover {
+  background-color: #059669;
+  border-color: #059669;
+}
+
+.icon-button-danger {
+  background-color: #ef4444;
+  border-color: #ef4444;
+  color: #ffffff;
+}
+
+.icon-button-danger:hover {
+  background-color: #dc2626;
+  border-color: #dc2626;
+}
+
+/* IconButton Sizes */
+.icon-button-sm {
+  min-width: 24px;
+  min-height: 24px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 12px;
+}
+
+.icon-button-lg {
+  min-width: 40px;
+  min-height: 40px;
+  font-size: 14px;
+  padding: 8px 12px;
+}
+
+.node-card-type {
+  position: absolute;
+  top: -24px;
+  left: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Data Quality Rating */
+.data-quality-rating {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.quality-circle {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid var(--border-active);
+}
+
+.quality-circle.filled {
+  background-color: var(--border-active);
+}
+
+.quality-circle.empty {
+  background-color: transparent;
+}
+
+/* Metadata Section */
+.node-card-metadata {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+  height: 16px;
+}
+
+.metadata-timestamp {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Alerts Section */
+.node-card-alerts {
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+}
+
+.error-warning-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--spacing-xs);
+  height: 20px;
+}
+
+.error-warning-item:last-child {
+  margin-bottom: 0;
+}
+
+.error-warning-text {
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.error-warning-item.error .error-warning-text {
+  color: #D3132F;
+}
+
+.error-warning-item.warning .error-warning-text {
+  color: #653E03;
+}
+
+/* View Children Button */
+.node-card-children-button {
+  position: absolute;
+  bottom: -26px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  left: 0;
+  right: 0;
+  padding-top: 8px;
+  /* transform: translateX(-50%); */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 200ms ease-in-out, visibility 200ms ease-in-out, transform 200ms ease-out;
+  pointer-events: none;
+}
+
+.node-card-base:hover .node-card-children-button {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 200ms ease-in-out, visibility 200ms ease-in-out, transform 200ms ease-out;
+  transition-delay: 0ms;
+  pointer-events: auto;
+}
+
+.node-card-base:hover .node-card-children-button .nc-button {
+  transform: translateY(8px);
+  transition-delay: 100ms;
+}
+
+/* Hide children button with delay when not hovering */
+.node-card-base:not(:hover) .node-card-children-button {
+  transition-delay: 0;
+}
+
+.node-card-base:not(:hover) .node-card-children-button .nc-button {
+  transform: translateY(0);
+  transition-delay: 0;
+}
+
+/* Children Section */
+.node-card-children {
+  margin-top: var(--spacing-xl);
+  animation: slideDown 200ms ease-out;
+}
+
+.children-header {
+  font-size: 12px;
+  line-height: 16px;
+  /* font-weight: 600; */
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.children-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 206px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin: 0 -16px 0;
+}
+
+/* Resize handle for children list */
+.children-resize-handle {
+  /* margin: 0 -16px; */
+  position: absolute;
+  bottom: -16px;
+  left: -16px;
+  right: -16px;
+  z-index: 9999; /* Very high z-index to ensure it's above everything */
+  pointer-events: auto;
+  isolation: isolate; /* Create a new stacking context */
+}
+
+.children-resize-handle:hover {
+  background: rgba(0, 0, 0, .04) !important;
+}
+
+.children-resize-handle:hover > div {
+  background: rgba(59, 130, 246, 0.5) !important;
+}
+
+.children-resize-handle.dragging {
+  background: rgba(59, 130, 246, 0.1) !important;
+  z-index: 10000; /* Even higher z-index when dragging */
+}
+
+.children-resize-handle.dragging > div {
+  background: rgba(59, 130, 246, 0.7) !important;
+}
+
+/* Ensure the drag handle completely blocks ReactFlow events */
+.children-resize-handle {
+  pointer-events: auto !important;
+}
+
+.children-resize-handle * {
+  pointer-events: none !important;
+}
+
+/* Prevent ReactFlow from capturing events on the handle area */
+.node-card-children {
+  position: relative;
+}
+
+.node-card-children .children-resize-handle {
+  pointer-events: auto !important;
+}
+
+.child-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 16px;
+  font-size: 12px;
+  cursor: pointer;
+  /* transition: background-color 150ms ease-out; */
+  position: relative; /* Enable positioning for handles */
+  box-sizing: border-box;
+  text-transform: uppercase;
+}
+.child-item:hover {
+  background-color: var(--background-hover);;
+}
+
+.child-item.selected {
+  background-color: rgba(59, 130, 246, 0.15);
+  /* border: 1px solid rgba(59, 130, 246, 0.3); */
+}
+
+.child-item.related {
+  background-color: rgba(34, 197, 94, 0.15);
+  border-left: 3px solid rgba(34, 197, 94, 0.5);
+}
+
+/* Column handles */
+.column-handle {
+  opacity: 0;
+  transition: none; /* Remove transition for immediate visibility */
+  z-index: 10;
+  position: absolute !important;
+  /* width: 1px !important;
+  height: 1px !important;
+  min-width: auto !important;
+  min-height: auto !important; */
+  background: transparent !important;
+  border: none !important;
+  top: calc(50% + 8px) !important;
+}
+
+.child-item:hover .column-handle,
+.child-item.selected .column-handle,
+.child-item.related .column-handle {
+  opacity: 1;
+}
+
+/* Visual indicators for handles using pseudo-elements */
+.column-handle-input::after {
+  content: '';
+  position: absolute;
+  /* width: 6px;
+  height: 6px;
+  background: #3b82f6;
+  border: 1px solid white; */
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  /* transform: translate(-50%, -50%); */
+  /* box-shadow: 0 0 0 1px rgba(0,0,0,0.1); */
+}
+
+.column-handle-output::after {
+  content: '';
+  position: absolute;
+  /* width: 6px;
+  height: 6px;
+  background: #10b981;
+  border: 1px solid white; */
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  /* transform: translate(-50%, -50%); */
+  /* box-shadow: 0 0 0 1px rgba(0,0,0,0.1); */
+}
+
+.column-handle-input {
+  background: transparent !important;
+}
+
+.column-handle-output {
+  background: transparent !important;
+}
+
+/* Main table handles - higher priority than column handles */
+.main-handle {
+  position: absolute !important;
+  z-index: 20 !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  background: transparent !important;
+  border: none !important;
+  width: 6px !important;
+  height: 6px !important;
+}
+
+.main-handle-input {
+  left: -3px !important;
+}
+
+.main-handle-output {
+  right: -3px !important;
+}
+
+.child-name {
+  color: var(--text-primary);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.child-type {
+  color: var(--text-secondary);
+  font-size: 9px;
+  margin-left: var(--spacing-xs);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
