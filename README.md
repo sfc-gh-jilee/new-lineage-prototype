@@ -116,4 +116,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Demo
 
-Visit the live demo: [https://yourusername.github.io/lineage-prototype](https://yourusername.github.io/lineage-prototype)# Lineage Prototype - Live Demo
+Visit the live demo: [[https://yourusername.github.io/lineage-prototype](https://sfc-gh-jilee.github.io/new-lineage-prototype/)]([https://yourusername.github.io/lineage-prototype](https://sfc-gh-jilee.github.io/new-lineage-prototype/))# Lineage Prototype - Live Demo
