@@ -1,4 +1,3 @@
-import React from 'react';
 import { EdgeProps, getBezierPath, EdgeLabelRenderer, BaseEdge } from 'reactflow';
 
 type EdgeData = {
@@ -66,7 +65,6 @@ const SPECIAL_EDGE_TYPES = {
 } as const;
 
 export function CustomEdge({
-  id,
   sourceX,
   sourceY,
   targetX,

@@ -20,16 +20,14 @@ import 'reactflow/dist/style.css';
 import { Drawer } from './components/Drawer';
 import { ContextualActionBar } from './components/ContextualActionBar';
 import { FilterPopover, type FilterOptions } from './components/FilterPopover';
-import { CustomEdge, customEdgeTypes } from './components/CustomEdge';
+import { customEdgeTypes } from './components/CustomEdge';
 import { NodeCard, type NodeCardData } from './components/NodeCard';
 import { GraphProvider, useGraphVisibility } from './context/GraphContext';
 import { useExpand } from './hooks/useLineage';
 import { elkLayout } from './lib/elkLayout';
 import { ALL_EDGES, NODE_BY_ID, ROOT_NODE_ID, COLUMN_LINEAGE, ALL_NODES } from './lib/mockData';
 import type { LineageNode } from './lib/types';
-import { SchemaMapView } from './SchemaMapView';
 import { container } from './styles.stylex';
-import { TreePerfView } from './TreePerfView';
 
 type EdgeData = { relation?: string; isColumnEdge?: boolean; isSelected?: boolean };
 const nodeTypes = { lineage: NodeCard } as const;
@@ -243,8 +241,6 @@ function LineageCanvasInner() {
     columnName: string;
   } | null>(null);
   const [showAllChildren, setShowAllChildren] = useState<boolean>(false);
-
-  const [elkDirection, setElkDirection] = useState<'RIGHT' | 'LEFT' | 'DOWN' | 'UP'>('RIGHT');
 
   const { fitView, getViewport, setViewport } = useReactFlow();
   const nodesRef = useRef<Node<NodeCardData>[]>([]);
@@ -486,26 +482,6 @@ function LineageCanvasInner() {
       setViewport({ ...currentViewport });
     }, 100);
   }, [showAllChildren, setRfNodes, getViewport, setViewport]);
-
-  const runElkOncePreservingCamera = useCallback(
-    async (dir: 'RIGHT' | 'LEFT' | 'DOWN' | 'UP') => {
-      const currentNodes = nodesRef.current;
-      const currentEdges = edgesRef.current;
-      if (!currentNodes.length) return;
-      const viewport = (getViewport?.() as any) || undefined;
-      try {
-        const idSet = new Set(currentNodes.map((n) => n.id));
-        const edgesForLayout = currentEdges.filter(
-          (e) => idSet.has(e.source) && idSet.has(e.target),
-        );
-        const laidOut = await elkLayout(currentNodes as any, edgesForLayout as any, dir);
-        setRfNodes(laidOut as unknown as Node<NodeCardData>[]);
-      } finally {
-        if (viewport) setTimeout(() => setViewport(viewport), 0);
-      }
-    },
-    [getViewport, setViewport, setRfNodes],
-  );
 
   useEffect(() => {
     if (didInit.current) return;
@@ -1374,7 +1350,6 @@ function LineageCanvasInner() {
 }
 
 export function GraphView() {
-  const [tab, setTab] = React.useState<'lineage' | 'tree' | 'schema'>('lineage');
   return (
     <div style={{ display: 'grid', gap: 8 }}>
       {/* <div style={{ display: 'flex', gap: 8, position: 'absolute', zIndex: 999, top: '16px', left: '16px' }}>
@@ -1403,19 +1378,13 @@ export function GraphView() {
           Schema Map
         </Button>
       </div> */}
-      {tab === 'lineage' ? (
-        <div className={container.root}>
-          <ReactFlowProvider>
-            <GraphProvider>
-              <LineageCanvasInner />
-            </GraphProvider>
-          </ReactFlowProvider>
-        </div>
-      ) : tab === 'tree' ? (
-        <TreePerfView />
-      ) : (
-        <SchemaMapView />
-      )}
+      <div className={container.root}>
+        <ReactFlowProvider>
+          <GraphProvider>
+            <LineageCanvasInner />
+          </GraphProvider>
+        </ReactFlowProvider>
+      </div>
     </div>
   );
 }
