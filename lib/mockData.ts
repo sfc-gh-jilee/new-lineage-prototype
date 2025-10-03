@@ -39,21 +39,21 @@ export const ALL_NODES: LineageNode[] = [
     { name: 'lifetime_value', type: 'DECIMAL' },
     { name: 'churn_probability', type: 'DECIMAL' },
     { name: 'last_activity', type: 'TIMESTAMP' }
-  ], '/icons/databricks-logo.png'),
+  ], 'icons/databricks-logo.png'),
   n('EXT.SALESFORCE.LEADS', 'Salesforce Leads', 'EXT_STAGE', undefined, '2024-01-01', undefined, undefined, [
     { name: 'lead_id', type: 'VARCHAR' },
     { name: 'company', type: 'VARCHAR' },
     { name: 'email', type: 'VARCHAR' },
     { name: 'status', type: 'VARCHAR' },
     { name: 'created_date', type: 'TIMESTAMP' }
-  ], '/icons/salesforce-logo.png'),
+  ], 'icons/salesforce-logo.png'),
   n('EXT.STRIPE.PAYMENTS', 'Stripe Payments', 'EXT_TABLE', undefined, '2024-01-01', undefined, undefined, [
     { name: 'payment_id', type: 'VARCHAR' },
     { name: 'customer_id', type: 'VARCHAR' },
     { name: 'amount', type: 'DECIMAL' },
     { name: 'currency', type: 'VARCHAR' },
     { name: 'status', type: 'VARCHAR' }
-  ], '/icons/stripe-logo.png'),
+  ], 'icons/stripe-logo.png'),
 
   // Raw data tables - lower quality scores, some with warnings
   n('RAW.PUBLIC.ORDERS_RAW', 'ORDERS_RAW', 'TABLE', 2, '2024-01-10', undefined, ['Missing timestamps', 'Inconsistent date formats', 'Null values in required fields'], [
@@ -247,17 +247,17 @@ export const ALL_NODES: LineageNode[] = [
     { name: 'sales_by_region', type: 'JSON' },
     { name: 'top_products', type: 'JSON' },
     { name: 'monthly_trends', type: 'JSON' }
-  ], '/icons/powerbi-logo.svg'),
+  ], 'icons/powerbi-logo.svg'),
   n('EXT.TABLEAU.EXECUTIVE_REPORTS', 'Executive Reports', 'EXTERNAL', undefined, '2024-01-20', undefined, undefined, [
     { name: 'kpi_metrics', type: 'JSON' },
     { name: 'performance_indicators', type: 'JSON' },
     { name: 'comparative_analysis', type: 'JSON' }
-  ], '/icons/tableau-logo.svg'),
+  ], 'icons/tableau-logo.svg'),
   n('EXT.LOOKER.CUSTOMER_INSIGHTS', 'Customer 360 View', 'EXTERNAL', undefined, '2024-01-20', undefined, undefined, [
     { name: 'customer_lifetime_value', type: 'DECIMAL' },
     { name: 'segmentation_data', type: 'JSON' },
     { name: 'behavior_patterns', type: 'JSON' }
-  ], '/icons/looker-logo.png'),
+  ], 'icons/looker-logo.png'),
 ];
 
 export const ALL_EDGES: RelEdge[] = [

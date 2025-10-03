@@ -11,37 +11,37 @@ const SPECIAL_EDGE_TYPES = {
   'DBT_MODEL': {
     label: 'dbt',
     color: '#FF6B35',
-    icon: '/icons/dbt.png', // Path to dbt logo
+    icon: 'icons/dbt.png', // Path to dbt logo
     description: 'dbt transformation'
   },
   'DBT_SNAPSHOT': {
     label: 'Snapshot',
     color: '#4ECDC4',
-    icon: '/icons/dbt.png', // Path to dbt logo
+    icon: 'icons/dbt.png', // Path to dbt logo
     description: 'dbt snapshot'
   },
   'DBT_SEED': {
     label: 'Seed',
     color: '#45B7D1',
-    icon: '/icons/dbt.png', // Path to dbt logo
+    icon: 'icons/dbt.png', // Path to dbt logo
     description: 'dbt seed'
   },
   'AIRFLOW_PIPELINE': {
     label: 'Airflow',
     color: '#017CEE',
-    icon: '/icons/airflow.png', // Path to Airflow logo
+    icon: 'icons/airflow.png', // Path to Airflow logo
     description: 'Airflow pipeline'
   },
   'SPARK_JOB': {
     label: 'Spark',
     color: '#E25A1C',
-    icon: '/icons/spark.png', // Path to Spark logo
+    icon: 'icons/spark.png', // Path to Spark logo
     description: 'Spark job'
   },
   'FIVETRAN_SYNC': {
     label: 'Fivetran',
     color: '#4C51BF',
-    icon: '/icons/fivetran.png', // Path to Fivetran logo
+    icon: 'icons/fivetran.png', // Path to Fivetran logo
     description: 'Fivetran sync'
   },
   // 'CTAS': {
