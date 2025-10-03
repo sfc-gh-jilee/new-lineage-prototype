@@ -103,8 +103,8 @@ export const tokens: DesignTokens = {
  *   boxShadow: tokens.shadows.md
  * });
  */
-export function createTokenStyles(styles: Record<string, string>): React.CSSProperties {
-  return styles as React.CSSProperties;
+export function createTokenStyles(styles: Partial<React.CSSProperties>): React.CSSProperties {
+  return styles;
 }
 
 /**
@@ -125,10 +125,14 @@ export const spacing = {
  */
 export const stylePatterns = {
   popover: {
-    get base() {
-      return createTokenStyles({
+    get base(): React.CSSProperties {
+      return {
         position: 'absolute',
-        backgroundColor: getToken('--bg-primary'),
+        top: '100%',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        marginTop: getToken('--space-2'),
+        backgroundColor: getToken('--bg-secondary'),
         borderRadius: getToken('--radius-lg'),
         padding: getToken('--space-3'),
         boxShadow: getToken('--shadow'),
@@ -136,24 +140,34 @@ export const stylePatterns = {
         lineHeight: getToken('--leading-normal'),
         pointerEvents: 'none',
         zIndex: getToken('--z-max'),
-      });
+      };
     },
-    get dataQuality() {
-      return createTokenStyles({
-        ...this.base,
-        background: '#fbfbfb',
+    get dataQuality(): React.CSSProperties {
+      return {
+        position: 'absolute',
+        top: '100%',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        marginTop: getToken('--space-2'),
+        backgroundColor: '#fbfbfb',
+        borderRadius: getToken('--radius-lg'),
+        padding: getToken('--space-3'),
         boxShadow: '0 4px 16px rgba(25, 30, 36, 0.2)',
+        fontSize: getToken('--text-sm'),
+        lineHeight: getToken('--leading-normal'),
+        pointerEvents: 'none',
+        zIndex: getToken('--z-max'),
         minWidth: '200px',
         maxWidth: '250px',
-      });
+      };
     }
   },
   interactive: {
-    get help() {
-      return createTokenStyles({
+    get help(): React.CSSProperties {
+      return {
         position: 'relative',
         cursor: 'help',
-      });
+      };
     }
   }
 };
