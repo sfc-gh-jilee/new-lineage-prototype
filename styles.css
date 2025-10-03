@@ -1,4 +1,7 @@
-/* Design tokens */
+/* Import design system tokens */
+/* @import './design-tokens.css'; */ /* Temporarily disabled - import may be causing issues */
+
+/* Legacy Design tokens - will be removed after migration */
 :root {
   --border-radius-rg: 8px;
   --border-radius-lg: 12px;
@@ -21,6 +24,35 @@
   --level2-background-color: #fbfbfb;
   --background-hover: rgba(0, 0, 0, .04);
   --shadow: 0 2px 8px 0 rgba(25, 30, 36, 0.15);
+
+  /* Design system tokens - inline for now */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+  --radius-2xl: 12px;
+  --radius-3xl: 16px;
+  --text-sm: 12px;
+  --font-semibold: 600;
+  --duration-fast: 150ms;
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --input-height: 24px;
+  --input-bg: transparent;
+  --bg-secondary: #f8fafc;
+  --blue-200: #bfdbfe;
+  --yellow-50: #fefce8;
+  --yellow-300: #fde047;
+  --red-50: #fef2f2;
+  --red-300: #fca5a5;
+  --gray-100: #f3f4f6;
+  --gray-300: #d1d5db;
+  --z-dropdown: 1000;
+  --z-max: 9999;
 }
 
 body {
@@ -79,19 +111,19 @@ body {
 /* Column selected nodes - bring to top */
 .node-card-base.column-selected {
   position: relative;
-  z-index: 1000; /* High z-index to bring to top */
-  box-shadow: 0 0 0 1px #D6E6FF;
+  z-index: var(--z-dropdown);
+  box-shadow: 0 0 0 1px var(--blue-200);
 }
 
 .node-card-base.column-selected:hover {
-  box-shadow: 0 0 0 2px #D6E6FF;
+  box-shadow: 0 0 0 2px var(--blue-200);
 }
 
 /* Ensure popovers always appear above everything */
 .error-warning-popover,
 .data-quality-popover,
 [data-popover="true"] {
-  z-index: 9999 !important; /* Highest z-index for all popovers */
+  z-index: var(--z-max) !important;
   position: absolute !important;
 }
 
@@ -205,26 +237,23 @@ body {
 } */
 
 .node-card-stage {
-  background-color: #fffbeb;
-  border-color: #fcd34d;
+  background-color: var(--yellow-50);
+  border-color: var(--yellow-300);
 }
 
 .node-card-dataset {
-  background-color: #f5f3ff;
-  border-color: #c4b5fd;
+  background-color: var(--blue-50);
+  border-color: var(--blue-300);
 }
 
 .node-card-model {
-  background-color: #fff1f2;
-  border-color: #fda4af;
+  background-color: var(--red-50);
+  border-color: var(--red-300);
 }
 
-/* .node-card-external {
-} */
-
 .node-card-default {
-  background-color: #f1f5f9;
-  border-color: #cbd5e1;
+  background-color: var(--gray-100);
+  border-color: var(--gray-300);
 }
 
 /* ReactFlow Handle Customization */
@@ -698,12 +727,12 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #f8fafc;
-  font-size: 12px;
-  font-weight: 600;
+  background: var(--bg-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
   text-transform: uppercase;
-  color: #64748b;
-  margin: 0 -8px 6px;
+  color: var(--text-secondary);
+  margin: 0 calc(-1 * var(--space-2)) var(--space-2);
 }
 
 .children-header-title {
@@ -747,15 +776,15 @@ hr {
 /* Search Input - Base State */
 .children-search-input {
   width: 100%;
-  height: 24px;
-  padding: 0 24px 0 28px; /* Left padding for search icon, right padding for clear button */
-  font-size: 12px;
+  height: var(--input-height);
+  padding: 0 var(--space-6) 0 calc(var(--space-6) + var(--space-1)); /* Right padding for clear button, left for search icon */
+  font-size: var(--text-sm);
   border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: #374151;
+  border-radius: var(--radius-md);
+  background: var(--input-bg);
+  color: var(--text-primary);
   outline: none;
-  transition: all 0.15s ease;
+  transition: all var(--duration-fast) var(--ease-out);
   box-sizing: border-box;
 }
 
