@@ -819,6 +819,7 @@ hr {
   justify-content: center;
   transition: all 0.15s ease;
   outline: none;
+  padding: 0;
 }
 
 /* Clear Button - Hover State */
@@ -860,29 +861,6 @@ hr {
 
 /* Responsive Design */
 @media (max-width: 768px) {
-  .children-search-container {
-    max-width: 150px;
-    margin-left: 8px;
-  }
-  
-  .children-search-icon {
-    left: 12px;
-    width: 16px;
-    height: 16px;
-  }
-  
-  .children-search-input {
-    font-size: 10px;
-    height: 22px;
-    padding: 0 22px 0 24px; /* Adjusted for smaller icon */
-  }
-  
-  .children-search-clear {
-    width: 14px;
-    height: 14px;
-    font-size: 10px;
-    right: 3px;
-  }
 }
 
 /* High Contrast Mode Support */
@@ -891,10 +869,6 @@ hr {
 
 /* Reduced Motion Support */
 @media (prefers-reduced-motion: reduce) {
-  .children-search-input,
-  .children-search-clear {
-    transition: none;
-  }
 }
 
 .children-list {

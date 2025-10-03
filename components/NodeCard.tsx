@@ -933,7 +933,7 @@ export function NodeCard({ data }: { data: NodeCardData }) {
                   e.stopPropagation(); // Prevent event from bubbling to ReactFlow
                   setSearchQuery(e.target.value);
                 }}
-                onFocus={(e) => e.stopPropagation()}
+                onFocus={(e) => e.stopPropagation()} 
                 onBlur={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
@@ -949,7 +949,9 @@ export function NodeCard({ data }: { data: NodeCardData }) {
                   onMouseDown={(e) => e.stopPropagation()}
                   title="Clear search"
                 >
-                  ×
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M8.70717 7.99998L11.8536 4.85356L11.1465 4.14645L8.00006 7.29288L4.85364 4.14645L4.14653 4.85356L7.29295 7.99998L4.14648 11.1465L4.85359 11.8536L8.00006 8.70709L11.1465 11.8536L11.8536 11.1465L8.70717 7.99998Z" fill="#fff"/>
+                  </svg>
                 </button>
               )}
             </div>
