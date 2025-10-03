@@ -54,6 +54,8 @@ body {
 }
 
 .node-card-base:hover {
+  position: relative;
+  z-index: 1500; /* Higher than column-selected but lower than popovers */
   border-color: var(--border-hover);
   /* box-shadow: var(--shadow); */
 }
@@ -83,6 +85,14 @@ body {
 
 .node-card-base.column-selected:hover {
   box-shadow: 0 0 0 2px #D6E6FF;
+}
+
+/* Ensure popovers always appear above everything */
+.error-warning-popover,
+.data-quality-popover,
+[data-popover="true"] {
+  z-index: 9999 !important; /* Highest z-index for all popovers */
+  position: absolute !important;
 }
 
 .node-card-header {

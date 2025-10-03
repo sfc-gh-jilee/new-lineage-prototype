@@ -294,6 +294,7 @@ function DataQualityRating({ score }: { score: number }) {
       {/* Popover */}
       {showPopover && (
         <div
+          className="data-quality-popover"
           style={{
             position: 'absolute',
             top: '100%',
@@ -304,7 +305,6 @@ function DataQualityRating({ score }: { score: number }) {
             borderRadius: 8,
             padding: 12,
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            zIndex: 1000,
             minWidth: 200,
             maxWidth: 250,
             fontSize: 12,
@@ -403,6 +403,7 @@ function CombinedErrorWarningIcon({ error, warning }: { error?: string | string[
       {/* Combined Popover */}
       {showPopover && (
         <div
+          className="error-warning-popover"
           style={{
             position: 'absolute',
             top: '100%',
@@ -413,7 +414,6 @@ function CombinedErrorWarningIcon({ error, warning }: { error?: string | string[
             borderRadius: 8,
             padding: 12,
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            zIndex: 1000,
             minWidth: 200,
             maxWidth: 300,
             fontSize: 12,
@@ -433,12 +433,12 @@ function CombinedErrorWarningIcon({ error, warning }: { error?: string | string[
               {errorMessages.map((msg, index) => (
                 <div key={`error-${index}`} style={{ marginBottom: index < errorMessages.length - 1 ? 8 : 0 }}>
                   <div style={{ color: '#1e252f', lineHeight: 1.5, marginBottom: 2 }}>
-                    {errorMessages.length > 1 && <span style={{ fontWeight: 500, color: '#dc2626' }}>{index + 1}. </span>}
+                    {errorMessages.length > 1 && <span>{index + 1}. </span>}
                     {msg}
                   </div>
                 </div>
               ))}
-              <div style={{ color: '#5d6a85', fontSize: 12, marginTop: 6 }}>
+              <div style={{ color: '#5d6a85', fontSize: 12, lineHeight: 1.5, marginTop: 6 }}>
                 {errorMessages.length > 1 ? 'These errors may impact data quality and should be addressed.' : 'This error may impact data quality and should be addressed.'}
               </div>
             </div>
@@ -458,12 +458,12 @@ function CombinedErrorWarningIcon({ error, warning }: { error?: string | string[
               {warningMessages.map((msg, index) => (
                 <div key={`warning-${index}`} style={{ marginBottom: index < warningMessages.length - 1 ? 8 : 0 }}>
                   <div style={{ color: '#1e252f', lineHeight: 1.4, marginBottom: 2 }}>
-                    {warningMessages.length > 1 && <span style={{ fontWeight: 500, color: '#F3BE0F' }}>{index + 1}. </span>}
+                    {warningMessages.length > 1 && <span>{index + 1}. </span>}
                     {msg}
                   </div>
                 </div>
               ))}
-              <div style={{ color: '#5d6a85', fontSize: 12, marginTop: 6 }}>
+              <div style={{ color: '#5d6a85', fontSize: 12, lineHeight: 1.5, marginTop: 6 }}>
                 {warningMessages.length > 1 ? 'These warnings should be reviewed to ensure data quality.' : 'This warning should be reviewed to ensure data quality.'}
               </div>
             </div>
@@ -532,6 +532,7 @@ function ErrorWarningIcon({ type, message }: { type: 'error' | 'warning'; messag
         {/* Popover */}
         {showPopover && (
           <div
+            className="error-warning-popover"
             style={{
               position: 'absolute',
               top: '100%',
@@ -542,7 +543,6 @@ function ErrorWarningIcon({ type, message }: { type: 'error' | 'warning'; messag
               borderRadius: 8,
               padding: 12,
               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-              zIndex: 1000,
               minWidth: 200,
               maxWidth: 300,
               fontSize: 12,
@@ -559,12 +559,12 @@ function ErrorWarningIcon({ type, message }: { type: 'error' | 'warning'; messag
             {messages.map((msg, index) => (
               <div key={index} style={{ marginBottom: index < messages.length - 1 ? 8 : 0 }}>
                 <div style={{ color: '#1e252f', lineHeight: 1.4, marginBottom: 2 }}>
-                  {hasMultiple && <span style={{ fontWeight: 500, color: '#dc2626' }}>{index + 1}. </span>}
+                  {hasMultiple && <span>{index + 1}. </span>}
                   {msg}
                 </div>
               </div>
             ))}
-            <div style={{ color: '#5d6a85', fontSize: 11, marginTop: 8 }}>
+            <div style={{ color: '#5d6a85', fontSize: 12, lineHeight: 1.5, marginTop: 8 }}>
               {hasMultiple ? 'These errors may impact data quality and should be addressed.' : 'This error may impact data quality and should be addressed.'}
             </div>
           </div>
@@ -620,12 +620,12 @@ function ErrorWarningIcon({ type, message }: { type: 'error' | 'warning'; messag
           {messages.map((msg, index) => (
             <div key={index} style={{ marginBottom: index < messages.length - 1 ? 8 : 0 }}>
               <div style={{ color: '#1e252f', lineHeight: 1.4, marginBottom: 2 }}>
-                {hasMultiple && <span style={{ fontWeight: 500, color: '#F3BE0F' }}>{index + 1}. </span>}
+                {hasMultiple && <span>{index + 1}. </span>}
                 {msg}
               </div>
             </div>
           ))}
-          <div style={{ color: '#5d6a85', fontSize: 11, marginTop: 8 }}>
+          <div style={{ color: '#5d6a85', fontSize: 12, lineHeight: 1.5, marginTop: 8 }}>
             {hasMultiple ? 'These warnings should be reviewed to ensure data quality.' : 'This warning should be reviewed to ensure data quality.'}
           </div>
         </div>
