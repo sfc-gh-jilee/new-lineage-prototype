@@ -469,20 +469,6 @@ function CombinedErrorWarningIcon({ error, warning }: { error?: string | string[
             </div>
           )}
           
-          {/* Arrow */}
-          <div
-            style={{
-              position: 'absolute',
-              top: -6,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: 0,
-              height: 0,
-              borderLeft: '6px solid transparent',
-              borderRight: '6px solid transparent',
-              borderBottom: '6px solid white',
-            }}
-          />
         </div>
       )}
     </div>
@@ -581,21 +567,6 @@ function ErrorWarningIcon({ type, message }: { type: 'error' | 'warning'; messag
             <div style={{ color: '#5d6a85', fontSize: 11, marginTop: 8 }}>
               {hasMultiple ? 'These errors may impact data quality and should be addressed.' : 'This error may impact data quality and should be addressed.'}
             </div>
-            
-            {/* Arrow */}
-            <div
-              style={{
-                position: 'absolute',
-                top: -6,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: 0,
-                height: 0,
-                borderLeft: '6px solid transparent',
-                borderRight: '6px solid transparent',
-                borderBottom: '6px solid white',
-              }}
-            />
           </div>
         )}
       </div>
@@ -657,21 +628,6 @@ function ErrorWarningIcon({ type, message }: { type: 'error' | 'warning'; messag
           <div style={{ color: '#5d6a85', fontSize: 11, marginTop: 8 }}>
             {hasMultiple ? 'These warnings should be reviewed to ensure data quality.' : 'This warning should be reviewed to ensure data quality.'}
           </div>
-          
-          {/* Arrow */}
-          <div
-            style={{
-              position: 'absolute',
-              top: -6,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: 0,
-              height: 0,
-              borderLeft: '6px solid transparent',
-              borderRight: '6px solid transparent',
-              borderBottom: '6px solid white',
-            }}
-          />
         </div>
       )}
     </div>

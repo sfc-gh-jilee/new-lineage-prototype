@@ -120,7 +120,7 @@ export function CustomEdge({
           >
             <div
               style={{
-                background: 'white',
+                background: '#FBFBFB',
                 border: '1px solid #d5dae4',
                 borderRadius: 8,
                 // padding: '0 8px',
@@ -140,8 +140,8 @@ export function CustomEdge({
                   src={specialEdge.icon} 
                   alt={`${specialEdge.label} icon`}
                   style={{ 
-                    width: 16, 
-                    height: 16, 
+                    width: 12, 
+                    height: 12, 
                     objectFit: 'contain',
                     filter: 'grayscale(100%)', // Make icons grayscale for consistency
                   }}
