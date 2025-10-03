@@ -624,7 +624,7 @@ body {
 }
 
 .error-warning-item {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   margin-bottom: var(--spacing-xs);
   height: 20px;
