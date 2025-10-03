@@ -1,4 +1,4 @@
-import type { LineageEdge, LineageNode, ObjType, ColumnLineageEdge } from './types';
+import type { LineageEdge, LineageNode, ObjType, ColumnLineageEdge, ColumnMetadata } from './types';
 
 type RelEdge = LineageEdge;
 
@@ -11,7 +11,8 @@ function n(
   error?: string | string[],
   warning?: string | string[],
   children?: Array<{ name: string; type: string }>,
-  brandIcon?: string
+  brandIcon?: string,
+  columnsMetadata?: ColumnMetadata[]
 ): LineageNode {
   return { 
     id, 
@@ -25,11 +26,53 @@ function n(
     error,
     warning,
     children,
-    brandIcon
+    brandIcon,
+    columnsMetadata
   };
 }
 function e(source: string, target: string, relation?: string): RelEdge {
   return { id: `${source}->${target}`, source, target, relation };
+}
+
+// Helper function to create detailed column metadata
+function col(
+  name: string,
+  type: string,
+  description?: string,
+  options?: {
+    nullable?: boolean;
+    primaryKey?: boolean;
+    foreignKey?: string;
+    defaultValue?: string;
+    constraints?: string[];
+    tags?: string[];
+    dataQualityScore?: number;
+    lastUpdated?: string;
+    sampleValues?: string[];
+    statistics?: {
+      uniqueCount?: number;
+      nullCount?: number;
+      avgLength?: number;
+      minValue?: string;
+      maxValue?: string;
+    };
+  }
+): ColumnMetadata {
+  return {
+    name,
+    type,
+    description,
+    nullable: options?.nullable ?? true,
+    primaryKey: options?.primaryKey ?? false,
+    foreignKey: options?.foreignKey,
+    defaultValue: options?.defaultValue,
+    constraints: options?.constraints ?? [],
+    tags: options?.tags ?? [],
+    dataQualityScore: options?.dataQualityScore,
+    lastUpdated: options?.lastUpdated ?? '2024-01-15',
+    sampleValues: options?.sampleValues ?? [],
+    statistics: options?.statistics
+  };
 }
 
 export const ALL_NODES: LineageNode[] = [
@@ -102,6 +145,67 @@ export const ALL_NODES: LineageNode[] = [
     { name: 'order_date', type: 'TIMESTAMP' },
     { name: 'total_amount', type: 'DECIMAL' },
     { name: 'status', type: 'VARCHAR' }
+  ], undefined, [
+    col('order_id', 'VARCHAR(50)', 'Unique identifier for each order', {
+      primaryKey: true,
+      nullable: false,
+      constraints: ['UNIQUE', 'NOT NULL'],
+      tags: ['PII', 'Business Key'],
+      dataQualityScore: 5,
+      sampleValues: ['ORD-2024-001', 'ORD-2024-002', 'ORD-2024-003'],
+      statistics: { uniqueCount: 15420, nullCount: 0, avgLength: 11 }
+    }),
+    col('customer_id', 'VARCHAR(50)', 'Reference to customer who placed the order', {
+      foreignKey: 'CUSTOMERS_STG.customer_id',
+      nullable: false,
+      constraints: ['FOREIGN KEY'],
+      tags: ['PII', 'Foreign Key'],
+      dataQualityScore: 4,
+      sampleValues: ['CUST-001', 'CUST-002', 'CUST-003'],
+      statistics: { uniqueCount: 8920, nullCount: 0, avgLength: 8 }
+    }),
+    col('product_id', 'VARCHAR(50)', 'Reference to ordered product', {
+      foreignKey: 'PRODUCTS_STG.product_id',
+      nullable: false,
+      constraints: ['FOREIGN KEY'],
+      tags: ['Business Key'],
+      dataQualityScore: 4,
+      sampleValues: ['PROD-001', 'PROD-002', 'PROD-003'],
+      statistics: { uniqueCount: 1250, nullCount: 0, avgLength: 8 }
+    }),
+    col('quantity', 'INTEGER', 'Number of items ordered', {
+      nullable: false,
+      constraints: ['CHECK (quantity > 0)'],
+      tags: ['Metric'],
+      dataQualityScore: 5,
+      sampleValues: ['1', '2', '5', '10'],
+      statistics: { uniqueCount: 25, nullCount: 0, minValue: '1', maxValue: '50' }
+    }),
+    col('order_date', 'TIMESTAMP', 'When the order was placed', {
+      nullable: false,
+      constraints: ['NOT NULL'],
+      tags: ['Temporal'],
+      dataQualityScore: 5,
+      sampleValues: ['2024-01-15 10:30:00', '2024-01-15 14:22:15', '2024-01-16 09:15:30'],
+      statistics: { uniqueCount: 15420, nullCount: 0 }
+    }),
+    col('total_amount', 'DECIMAL(10,2)', 'Total order value in USD', {
+      nullable: false,
+      constraints: ['CHECK (total_amount >= 0)'],
+      tags: ['Financial', 'Metric'],
+      dataQualityScore: 4,
+      sampleValues: ['29.99', '149.50', '75.25', '199.99'],
+      statistics: { uniqueCount: 8920, nullCount: 0, minValue: '5.99', maxValue: '2499.99' }
+    }),
+    col('status', 'VARCHAR(20)', 'Current order status', {
+      nullable: false,
+      defaultValue: 'PENDING',
+      constraints: ['CHECK (status IN (\'PENDING\', \'CONFIRMED\', \'SHIPPED\', \'DELIVERED\', \'CANCELLED\'))'],
+      tags: ['Status'],
+      dataQualityScore: 5,
+      sampleValues: ['PENDING', 'CONFIRMED', 'SHIPPED', 'DELIVERED'],
+      statistics: { uniqueCount: 5, nullCount: 0, avgLength: 8 }
+    })
   ]),
   n('STG.PUBLIC.CUSTOMERS_STG', 'CUSTOMERS_STG', 'TABLE', 5, '2024-01-15', undefined, undefined, [
     { name: 'customer_id', type: 'VARCHAR' },
@@ -112,6 +216,73 @@ export const ALL_NODES: LineageNode[] = [
     { name: 'address', type: 'VARCHAR' },
     { name: 'created_at', type: 'TIMESTAMP' },
     { name: 'updated_at', type: 'TIMESTAMP' }
+  ], undefined, [
+    col('customer_id', 'VARCHAR(50)', 'Unique customer identifier', {
+      primaryKey: true,
+      nullable: false,
+      constraints: ['UNIQUE', 'NOT NULL'],
+      tags: ['PII', 'Business Key'],
+      dataQualityScore: 5,
+      sampleValues: ['CUST-001', 'CUST-002', 'CUST-003'],
+      statistics: { uniqueCount: 8920, nullCount: 0, avgLength: 8 }
+    }),
+    col('first_name', 'VARCHAR(100)', 'Customer first name', {
+      nullable: false,
+      constraints: ['NOT NULL'],
+      tags: ['PII', 'Personal Data'],
+      dataQualityScore: 4,
+      sampleValues: ['John', 'Jane', 'Michael', 'Sarah'],
+      statistics: { uniqueCount: 2450, nullCount: 12, avgLength: 6 }
+    }),
+    col('last_name', 'VARCHAR(100)', 'Customer last name', {
+      nullable: false,
+      constraints: ['NOT NULL'],
+      tags: ['PII', 'Personal Data'],
+      dataQualityScore: 4,
+      sampleValues: ['Smith', 'Johnson', 'Williams', 'Brown'],
+      statistics: { uniqueCount: 3200, nullCount: 8, avgLength: 7 }
+    }),
+    col('email', 'VARCHAR(255)', 'Customer email address', {
+      nullable: false,
+      constraints: ['UNIQUE', 'CHECK (email LIKE \'%@%\')'],
+      tags: ['PII', 'Contact', 'Unique'],
+      dataQualityScore: 5,
+      sampleValues: ['john.smith@email.com', 'jane.doe@company.com'],
+      statistics: { uniqueCount: 8920, nullCount: 0, avgLength: 24 }
+    }),
+    col('phone', 'VARCHAR(20)', 'Customer phone number', {
+      nullable: true,
+      constraints: ['CHECK (phone ~ \'^\\+?[0-9\\-\\s\\(\\)]+$\')'],
+      tags: ['PII', 'Contact'],
+      dataQualityScore: 3,
+      sampleValues: ['+1-555-123-4567', '(555) 987-6543', '555.111.2222'],
+      statistics: { uniqueCount: 7890, nullCount: 1030, avgLength: 14 }
+    }),
+    col('address', 'TEXT', 'Customer mailing address', {
+      nullable: true,
+      tags: ['PII', 'Location'],
+      dataQualityScore: 3,
+      sampleValues: ['123 Main St, Anytown, ST 12345', '456 Oak Ave, City, ST 67890'],
+      statistics: { uniqueCount: 8100, nullCount: 820, avgLength: 45 }
+    }),
+    col('created_at', 'TIMESTAMP', 'Account creation timestamp', {
+      nullable: false,
+      defaultValue: 'CURRENT_TIMESTAMP',
+      constraints: ['NOT NULL'],
+      tags: ['Temporal', 'Audit'],
+      dataQualityScore: 5,
+      sampleValues: ['2024-01-10 08:15:30', '2024-01-12 16:45:22'],
+      statistics: { uniqueCount: 8920, nullCount: 0 }
+    }),
+    col('updated_at', 'TIMESTAMP', 'Last update timestamp', {
+      nullable: false,
+      defaultValue: 'CURRENT_TIMESTAMP',
+      constraints: ['NOT NULL'],
+      tags: ['Temporal', 'Audit'],
+      dataQualityScore: 5,
+      sampleValues: ['2024-01-15 10:30:15', '2024-01-16 14:22:45'],
+      statistics: { uniqueCount: 8920, nullCount: 0 }
+    })
   ]),
   n('STG.PUBLIC.PRODUCTS_STG', 'PRODUCTS_STG', 'TABLE', 4, '2024-01-15', 'Schema validation failed', 'Slow refresh', [
     { name: 'product_id', type: 'VARCHAR' },
@@ -122,6 +293,73 @@ export const ALL_NODES: LineageNode[] = [
     { name: 'inventory_count', type: 'INTEGER' },
     { name: 'created_at', type: 'TIMESTAMP' },
     { name: 'updated_at', type: 'TIMESTAMP' }
+  ], undefined, [
+    col('product_id', 'VARCHAR(50)', 'Unique product identifier', {
+      primaryKey: true,
+      nullable: false,
+      constraints: ['UNIQUE', 'NOT NULL'],
+      tags: ['Business Key'],
+      dataQualityScore: 5,
+      sampleValues: ['PROD-001', 'PROD-002', 'PROD-003'],
+      statistics: { uniqueCount: 1250, nullCount: 0, avgLength: 8 }
+    }),
+    col('product_name', 'VARCHAR(200)', 'Product display name', {
+      nullable: false,
+      constraints: ['NOT NULL'],
+      tags: ['Display'],
+      dataQualityScore: 4,
+      sampleValues: ['Wireless Headphones', 'Gaming Laptop', 'Coffee Maker'],
+      statistics: { uniqueCount: 1250, nullCount: 0, avgLength: 25 }
+    }),
+    col('category', 'VARCHAR(100)', 'Product category classification', {
+      nullable: false,
+      constraints: ['NOT NULL'],
+      tags: ['Classification'],
+      dataQualityScore: 3,
+      sampleValues: ['Electronics', 'Home & Garden', 'Sports', 'Books'],
+      statistics: { uniqueCount: 45, nullCount: 15, avgLength: 12 }
+    }),
+    col('price', 'DECIMAL(10,2)', 'Product price in USD', {
+      nullable: false,
+      constraints: ['CHECK (price > 0)'],
+      tags: ['Financial', 'Metric'],
+      dataQualityScore: 4,
+      sampleValues: ['29.99', '599.99', '15.50', '1299.00'],
+      statistics: { uniqueCount: 890, nullCount: 0, minValue: '5.99', maxValue: '2999.99' }
+    }),
+    col('description', 'TEXT', 'Detailed product description', {
+      nullable: true,
+      tags: ['Content'],
+      dataQualityScore: 2,
+      sampleValues: ['High-quality wireless headphones with noise cancellation', 'Professional gaming laptop with RTX graphics'],
+      statistics: { uniqueCount: 1100, nullCount: 150, avgLength: 120 }
+    }),
+    col('inventory_count', 'INTEGER', 'Current inventory quantity', {
+      nullable: false,
+      constraints: ['CHECK (inventory_count >= 0)'],
+      tags: ['Inventory', 'Metric'],
+      dataQualityScore: 4,
+      sampleValues: ['50', '0', '125', '8'],
+      statistics: { uniqueCount: 200, nullCount: 0, minValue: '0', maxValue: '500' }
+    }),
+    col('created_at', 'TIMESTAMP', 'Product creation timestamp', {
+      nullable: false,
+      defaultValue: 'CURRENT_TIMESTAMP',
+      constraints: ['NOT NULL'],
+      tags: ['Temporal', 'Audit'],
+      dataQualityScore: 5,
+      sampleValues: ['2024-01-05 09:30:00', '2024-01-08 14:15:30'],
+      statistics: { uniqueCount: 1250, nullCount: 0 }
+    }),
+    col('updated_at', 'TIMESTAMP', 'Last update timestamp', {
+      nullable: false,
+      defaultValue: 'CURRENT_TIMESTAMP',
+      constraints: ['NOT NULL'],
+      tags: ['Temporal', 'Audit'],
+      dataQualityScore: 5,
+      sampleValues: ['2024-01-15 11:45:22', '2024-01-16 16:30:15'],
+      statistics: { uniqueCount: 1250, nullCount: 0 }
+    })
   ]),
   n('STG.PUBLIC.PAYMENTS_STG', 'PAYMENTS_STG', 'TABLE', 3, '2024-01-15', 'Data validation error', undefined, [
     { name: 'payment_id', type: 'VARCHAR' },

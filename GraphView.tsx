@@ -232,6 +232,10 @@ function LineageCanvasInner() {
     }
   }, [onNodesChange, selectedNodeIds, rfNodes]);
   const [selectedChildrenByNode, setSelectedChildrenByNode] = useState<Record<string, Set<string>>>({});
+  const [focusedColumn, setFocusedColumn] = useState<{
+    nodeId: string;
+    columnName: string;
+  } | null>(null);
   const [selectedColumnLineage, setSelectedColumnLineage] = useState<{
     nodeId: string;
     columnName: string;
@@ -658,6 +662,7 @@ function LineageCanvasInner() {
       const upstreamExpanded = !!expandedUpstreamByNode[n.id]?.size;
       const downstreamExpanded = !!expandedDownstreamByNode[n.id]?.size;
       const selectedChildren = selectedChildrenByNode[n.id] || new Set<string>();
+      const focusedChild = focusedColumn?.nodeId === n.id ? focusedColumn.columnName : undefined;
       const isMultiSelected = selectedNodeIds.has(n.id);
       const isPrimarySelected = selectedNodeId === n.id;
       const isSelected = isPrimarySelected || isMultiSelected; // Show selected style for all multi-selected nodes
@@ -671,6 +676,7 @@ function LineageCanvasInner() {
           selected: isSelected,
           multiSelected: isMultiSelected,
           selectedChildren,
+          focusedChild,
           onToggleUpstream: () =>
             upstreamExpanded ? handleCollapse(n.id, 'up') : handleExpand(n.id, 'up'),
           onToggleDownstream: () =>
@@ -865,10 +871,22 @@ function LineageCanvasInner() {
               }
             });
           },
+          onFocusChild: (childName: string) => {
+            // Set focused column for side panel
+            setFocusedColumn({ nodeId: n.id, columnName: childName });
+            // Also set the drawer to show column details
+            setDrawerNode({
+              ...n,
+              data: {
+                ...n.data,
+                focusedChild: childName
+              }
+            });
+          },
         },
       };
     });
-  }, [rfNodes, expandedUpstreamByNode, expandedDownstreamByNode, selectedNodeId, selectedNodeIds, selectedChildrenByNode, handleExpand, handleCollapse, visibleNodeIds, setVisibleNodeIds, setRfNodes, setRfEdges, positionRelatedNodes, setSelectedColumnLineage, setSelectedChildrenByNode]);
+  }, [rfNodes, expandedUpstreamByNode, expandedDownstreamByNode, selectedNodeId, selectedNodeIds, selectedChildrenByNode, focusedColumn, handleExpand, handleCollapse, visibleNodeIds, setVisibleNodeIds, setRfNodes, setRfEdges, positionRelatedNodes, setSelectedColumnLineage, setSelectedChildrenByNode]);
 
   // Add column lineage edges to the regular edges
   const allEdges = useMemo(() => {
@@ -963,6 +981,7 @@ function LineageCanvasInner() {
     setSelectedChildrenByNode({}); // Clear all selected children
     setSelectedColumnLineage(null); // Clear column lineage
     setHoveredColumnLineage(null); // Clear hovered column lineage
+    setFocusedColumn(null); // Clear focused column
   }, []);
   const closeDrawer = useCallback(() => {
     setDrawerNode(null);
@@ -972,7 +991,9 @@ function LineageCanvasInner() {
     setSelectedChildrenByNode({}); // Clear all selected children
     setSelectedColumnLineage(null); // Clear column lineage
     setHoveredColumnLineage(null); // Clear hovered column lineage
+    setFocusedColumn(null); // Clear focused column
   }, []);
+
 
   // Contextual action bar handlers
   const handleShowAllColumnsForSelected = useCallback(() => {
@@ -1276,11 +1297,268 @@ function LineageCanvasInner() {
         
         {/* Drawer - pushes content instead of overlaying */}
         <Drawer
-          title={drawerNode ? 'Object' : drawerEdge ? 'Relationship' : ''}
+          title={drawerNode ? (drawerNode.data.focusedChild ? 'Column Details' : 'Object') : drawerEdge ? 'Relationship' : ''}
           isOpen={!!(drawerNode || drawerEdge)}
           onClose={closeDrawer}
         >
-          {drawerNode && (
+          {drawerNode && drawerNode.data.focusedChild ? (
+            // Show column details when a column is focused
+            (() => {
+              const columnMetadata = drawerNode.data.columnsMetadata?.find(
+                (col: any) => col.name === drawerNode.data.focusedChild
+              );
+              
+              if (!columnMetadata) {
+                return (
+                  <div style={{ display: 'grid', gap: 12, fontSize: 13 }}>
+                    <div style={{ color: '#64748b', fontSize: 12 }}>
+                      {drawerNode.data.name}.{drawerNode.data.focusedChild}
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>
+                      {drawerNode.data.focusedChild}
+                    </div>
+                    <div>
+                      <span style={{ fontWeight: 600 }}>Type:</span> {
+                        drawerNode.data.children?.find(c => c.name === drawerNode.data.focusedChild)?.type || 'UNKNOWN'
+                      }
+                    </div>
+                    <div style={{ color: '#64748b', fontStyle: 'italic' }}>
+                      No detailed metadata available for this column.
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div style={{ display: 'grid', gap: 16, fontSize: 13 }}>
+                  {/* Header */}
+                  <div>
+                    <div style={{ color: '#64748b', fontSize: 12, wordBreak: 'break-word' }}>
+                      {drawerNode.data.name}.{columnMetadata.name}
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: 16, wordBreak: 'break-word', marginTop: 4 }}>
+                      {columnMetadata.name}
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: 14, marginTop: 2 }}>
+                      {columnMetadata.type}
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  {columnMetadata.description && (
+                    <div>
+                      <div style={{ fontWeight: 600, marginBottom: 4 }}>Description</div>
+                      <div style={{ color: '#475569', lineHeight: 1.4 }}>
+                        {columnMetadata.description}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Properties */}
+                  <div>
+                    <div style={{ fontWeight: 600, marginBottom: 8 }}>Properties</div>
+                    <div style={{ display: 'grid', gap: 6, fontSize: 12 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Nullable:</span>
+                        <span style={{ color: columnMetadata.nullable ? '#059669' : '#dc2626' }}>
+                          {columnMetadata.nullable ? 'Yes' : 'No'}
+                        </span>
+                      </div>
+                      {columnMetadata.primaryKey && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Primary Key:</span>
+                          <span style={{ color: '#dc2626', fontWeight: 600 }}>Yes</span>
+                        </div>
+                      )}
+                      {columnMetadata.foreignKey && (
+                        <div>
+                          <span style={{ fontWeight: 500 }}>Foreign Key:</span>
+                          <div style={{ 
+                            marginTop: 2, 
+                            padding: 6, 
+                            backgroundColor: '#f8fafc', 
+                            borderRadius: 4,
+                            fontFamily: 'monospace',
+                            fontSize: 11
+                          }}>
+                            {columnMetadata.foreignKey}
+                          </div>
+                        </div>
+                      )}
+                      {columnMetadata.defaultValue && (
+                        <div>
+                          <span style={{ fontWeight: 500 }}>Default:</span>
+                          <span style={{ 
+                            marginLeft: 8,
+                            padding: '2px 6px',
+                            backgroundColor: '#f1f5f9',
+                            borderRadius: 3,
+                            fontFamily: 'monospace',
+                            fontSize: 11
+                          }}>
+                            {columnMetadata.defaultValue}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Data Quality */}
+                  {columnMetadata.dataQualityScore !== undefined && (
+                    <div>
+                      <div style={{ fontWeight: 600, marginBottom: 4 }}>Data Quality Score</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ 
+                          width: 40, 
+                          height: 20, 
+                          backgroundColor: '#f1f5f9', 
+                          borderRadius: 10,
+                          position: 'relative',
+                          overflow: 'hidden'
+                        }}>
+                          <div style={{
+                            width: `${(columnMetadata.dataQualityScore / 5) * 100}%`,
+                            height: '100%',
+                            backgroundColor: columnMetadata.dataQualityScore >= 4 ? '#10b981' : 
+                                           columnMetadata.dataQualityScore >= 3 ? '#f59e0b' : '#ef4444',
+                            borderRadius: 10
+                          }} />
+                        </div>
+                        <span style={{ fontSize: 12, color: '#64748b' }}>
+                          {columnMetadata.dataQualityScore}/5
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tags */}
+                  {columnMetadata.tags && columnMetadata.tags.length > 0 && (
+                    <div>
+                      <div style={{ fontWeight: 600, marginBottom: 6 }}>Tags</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {columnMetadata.tags.map((tag: string) => (
+                          <span key={tag} style={{
+                            padding: '2px 8px',
+                            backgroundColor: '#e2e8f0',
+                            borderRadius: 12,
+                            fontSize: 11,
+                            color: '#475569'
+                          }}>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sample Values */}
+                  {columnMetadata.sampleValues && columnMetadata.sampleValues.length > 0 && (
+                    <div>
+                      <div style={{ fontWeight: 600, marginBottom: 6 }}>Sample Values</div>
+                      <div style={{ 
+                        padding: 8, 
+                        backgroundColor: '#f8fafc', 
+                        borderRadius: 6,
+                        fontSize: 11,
+                        fontFamily: 'monospace'
+                      }}>
+                        {columnMetadata.sampleValues.slice(0, 4).map((value: string, i: number) => (
+                          <div key={i} style={{ marginBottom: i < 3 ? 2 : 0 }}>
+                            {value}
+                          </div>
+                        ))}
+                        {columnMetadata.sampleValues.length > 4 && (
+                          <div style={{ color: '#64748b', fontStyle: 'italic' }}>
+                            ... and {columnMetadata.sampleValues.length - 4} more
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Statistics */}
+                  {columnMetadata.statistics && (
+                    <div>
+                      <div style={{ fontWeight: 600, marginBottom: 8 }}>Statistics</div>
+                      <div style={{ display: 'grid', gap: 4, fontSize: 12 }}>
+                        {columnMetadata.statistics.uniqueCount !== undefined && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Unique Values:</span>
+                            <span>{columnMetadata.statistics.uniqueCount.toLocaleString()}</span>
+                          </div>
+                        )}
+                        {columnMetadata.statistics.nullCount !== undefined && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Null Count:</span>
+                            <span style={{ color: columnMetadata.statistics.nullCount > 0 ? '#f59e0b' : '#10b981' }}>
+                              {columnMetadata.statistics.nullCount.toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                        {columnMetadata.statistics.avgLength !== undefined && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Avg Length:</span>
+                            <span>{columnMetadata.statistics.avgLength}</span>
+                          </div>
+                        )}
+                        {columnMetadata.statistics.minValue !== undefined && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Min Value:</span>
+                            <span style={{ fontFamily: 'monospace', fontSize: 11 }}>
+                              {columnMetadata.statistics.minValue}
+                            </span>
+                          </div>
+                        )}
+                        {columnMetadata.statistics.maxValue !== undefined && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Max Value:</span>
+                            <span style={{ fontFamily: 'monospace', fontSize: 11 }}>
+                              {columnMetadata.statistics.maxValue}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Constraints */}
+                  {columnMetadata.constraints && columnMetadata.constraints.length > 0 && (
+                    <div>
+                      <div style={{ fontWeight: 600, marginBottom: 6 }}>Constraints</div>
+                      <div style={{ 
+                        padding: 8, 
+                        backgroundColor: '#fef3c7', 
+                        borderRadius: 6,
+                        fontSize: 11
+                      }}>
+                        {columnMetadata.constraints.map((constraint: string, i: number) => (
+                          <div key={i} style={{ 
+                            marginBottom: i < columnMetadata.constraints!.length - 1 ? 4 : 0,
+                            fontFamily: 'monospace'
+                          }}>
+                            {constraint}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Last Updated */}
+                  {columnMetadata.lastUpdated && (
+                    <div style={{ 
+                      paddingTop: 8, 
+                      borderTop: '1px solid #e2e8f0',
+                      fontSize: 11,
+                      color: '#64748b'
+                    }}>
+                      Last updated: {columnMetadata.lastUpdated}
+                    </div>
+                  )}
+                </div>
+              );
+            })()
+          ) : drawerNode ? (
+            // Show node details when no column is focused
             <div style={{ display: 'grid', gap: 12, fontSize: 13 }}>
               <div style={{ color: '#64748b', fontSize: 12, wordBreak: 'break-word' }}>
                 {drawerNode.data.name}
@@ -1300,7 +1578,7 @@ function LineageCanvasInner() {
                 (Put object DDL / SQL definition here.)
               </div>
             </div>
-          )}
+          ) : null}
           {drawerEdge && (
             <div style={{ display: 'grid', gap: 12, fontSize: 13 }}>
               <div style={{ wordBreak: 'break-word' }}>

@@ -121,7 +121,7 @@ export function CustomEdge({
             <div
               style={{
                 background: 'white',
-                border: `1.5px solid #d5dae4`,
+                border: '1px solid #d5dae4',
                 borderRadius: 8,
                 // padding: '0 8px',
                 display: 'flex',

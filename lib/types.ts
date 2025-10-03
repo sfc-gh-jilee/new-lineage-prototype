@@ -1,5 +1,27 @@
 export type ObjType = 'TABLE' | 'VIEW' | 'STAGE' | 'DATASET' | 'MODEL' | 'EXTERNAL' | 'EXT_TABLE' | 'EXT_STAGE';
 
+export type ColumnMetadata = {
+  name: string;
+  type: string;
+  description?: string;
+  nullable?: boolean;
+  primaryKey?: boolean;
+  foreignKey?: string; // Reference to another table.column
+  defaultValue?: string;
+  constraints?: string[];
+  tags?: string[];
+  dataQualityScore?: number;
+  lastUpdated?: string;
+  sampleValues?: string[];
+  statistics?: {
+    uniqueCount?: number;
+    nullCount?: number;
+    avgLength?: number;
+    minValue?: string;
+    maxValue?: string;
+  };
+};
+
 export type LineageNode = {
   id: string;
   name: string;
@@ -11,7 +33,8 @@ export type LineageNode = {
   createdTimestamp?: string;
   error?: string | string[];
   warning?: string | string[];
-  children?: Array<{ name: string; type: string }>;
+  children?: Array<{ name: string; type: string }>; // Simple version for display
+  columnsMetadata?: ColumnMetadata[]; // Detailed version for side panel
   brandIcon?: string; // Path to brand icon for external nodes
 };
 

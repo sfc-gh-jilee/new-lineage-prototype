@@ -1,7 +1,7 @@
 import { IconButton } from './IconButton';
 import React, { useState, useRef, useEffect } from 'react';
 import { Handle, Position } from 'reactflow';
-import type { ObjType } from '../lib/types';
+import type { ObjType, ColumnMetadata } from '../lib/types';
 import { colors, nodeCard } from '../styles';
 
 export type NodeCardData = {
@@ -19,12 +19,15 @@ export type NodeCardData = {
   error?: string | string[]; // Single error message or array of error messages
   warning?: string | string[]; // Single warning message or array of warning messages
   children?: Array<{ name: string; type: string; selected?: boolean }>; // columns or child objects
-  selectedChildren?: Set<string>; // Track selected column names
+  selectedChildren?: Set<string>; // Track selected column names (auto-selected by app)
+  focusedChild?: string; // Track explicitly focused column (user clicked)
+  columnsMetadata?: ColumnMetadata[]; // Detailed column metadata for side panel
   brandIcon?: string; // Path to brand icon for external nodes
   onToggleUpstream?: () => void;
   onToggleDownstream?: () => void;
   onToggleChildren?: () => void;
   onSelectChild?: (childName: string) => void;
+  onFocusChild?: (childName: string) => void; // Explicit focus for side panel
   onClearColumnLineage?: () => void; // Clear column lineage selection
   onHoverChild?: (childName: string) => void; // Hover over column
   onUnhoverChild?: () => void; // Stop hovering over column
@@ -679,6 +682,7 @@ export function NodeCard({ data }: { data: NodeCardData }) {
   const [childrenListHeight, setChildrenListHeight] = useState<number>(206); // Default height
   const [isAutoExpanded, setIsAutoExpanded] = useState<boolean>(false); // Track if auto-expanded
   const [isDragging, setIsDragging] = useState(false);
+  const [searchQuery, setSearchQuery] = useState<string>(''); // Search query for filtering columns
   const dragStartRef = useRef<{ y: number; height: number } | null>(null);
   const lastClickTimeRef = useRef<number>(0);
 
@@ -914,7 +918,42 @@ export function NodeCard({ data }: { data: NodeCardData }) {
       {/* Children section - shows when expanded */}
       {data.childrenExpanded && data.children && data.children.length > 0 && (
         <div className="node-card-children">
-          <div className="children-header">Columns</div>
+          <div className="children-header">
+            <div className="children-search-container">
+              <svg className="children-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="m21 21-4.35-4.35"></path>
+              </svg>
+              <input
+                type="text"
+                className="children-search-input"
+                placeholder="Columns"
+                value={searchQuery}
+                onChange={(e) => {
+                  e.stopPropagation(); // Prevent event from bubbling to ReactFlow
+                  setSearchQuery(e.target.value);
+                }}
+                onFocus={(e) => e.stopPropagation()}
+                onBlur={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              />
+              {searchQuery && (
+                <button
+                  className="children-search-clear"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSearchQuery('');
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  title="Clear search"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          </div>
           <div 
             className="children-list"
             style={{ 
@@ -937,19 +976,31 @@ export function NodeCard({ data }: { data: NodeCardData }) {
               }
             }}
           >
-            {data.children.map((child, index) => {
-              const isSelected = data.selectedChildren?.has(child.name) || false;
-              const isPrimarySelection = data.selectedChildren?.has(child.name) && 
-                data.selectedChildren?.size === 1; // Only this column is selected in this node
-              const isRelatedColumn = isSelected && !isPrimarySelection;
+            {data.children
+              .filter(child => {
+                // Filter columns based on search query
+                if (!searchQuery.trim()) return true;
+                const query = searchQuery.toLowerCase();
+                return child.name.toLowerCase().includes(query) || 
+                       child.type.toLowerCase().includes(query);
+              })
+              .map((child, index) => {
+                const isSelected = data.selectedChildren?.has(child.name) || false;
+                const isFocused = data.focusedChild === child.name;
+                const isPrimarySelection = data.selectedChildren?.has(child.name) && 
+                  data.selectedChildren?.size === 1; // Only this column is selected in this node
+                const isRelatedColumn = isSelected && !isPrimarySelection;
               
               return (
                 <div 
                   key={index} 
-                  className={`child-item ${isSelected ? 'selected' : ''} ${isRelatedColumn ? 'related' : ''}`}
+                  className={`child-item ${isSelected ? 'selected' : ''} ${isFocused ? 'focused' : ''} ${isRelatedColumn ? 'related' : ''}`}
                   onClick={(e) => {
                     e.stopPropagation();
+                    // First handle selection for lineage
                     data.onSelectChild?.(child.name);
+                    // Then handle focus for side panel
+                    data.onFocusChild?.(child.name);
                   }}
                   onMouseEnter={() => {
                     data.onHoverChild?.(child.name);
