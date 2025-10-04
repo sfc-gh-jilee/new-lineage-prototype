@@ -1,5 +1,6 @@
 import { IconButton } from './IconButton';
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Handle, Position, NodeToolbar } from 'reactflow';
 import type { ObjType, ColumnMetadata } from '../lib/types';
 import { colors, nodeCard } from '../styles';
@@ -236,10 +237,18 @@ function typeDisplay(t: ObjType) {
 function DataQualityRating({ score }: { score: number }) {
   const [showPopover, setShowPopover] = useState(false);
   const [hoverTimeout, setHoverTimeout] = useState<number | null>(null);
+  const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleMouseEnter = () => {
     const timeout = window.setTimeout(() => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setPopoverPosition({
+          top: rect.bottom + 8, // 8px below the element
+          left: rect.left + rect.width / 2, // Center horizontally
+        });
+      }
       setShowPopover(true);
     }, 400);
     setHoverTimeout(timeout);
@@ -292,10 +301,17 @@ function DataQualityRating({ score }: { score: number }) {
         />
       ))}
       
-      {/* Popover */}
-      {showPopover && (
+      {/* Popover - rendered via portal */}
+      {showPopover && createPortal(
         <div
           className="data-quality-popover popover-base popover-data-quality"
+          style={{
+            position: 'fixed',
+            top: `${popoverPosition.top}px`,
+            left: `${popoverPosition.left}px`,
+            transform: 'translateX(-50%)',
+            zIndex: 9999,
+          }}
         >
           <div style={{ fontWeight: 600, marginBottom: tokens.spacing.xs, color: tokens.colors.text }}>
             Data Quality: {getQualityLabel(score)}
@@ -306,8 +322,8 @@ function DataQualityRating({ score }: { score: number }) {
           <div style={{ color: tokens.colors.text, lineHeight: 1.4 }}>
             {getQualityDescription(score)}
           </div>
-
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
