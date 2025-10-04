@@ -760,13 +760,14 @@ export function NodeCard({ data }: { data: NodeCardData }) {
 
   return (
     <>
-      {/* NodeToolbar - floating toolbar on hover */}
+      {/* NodeToolbar - Top Left (Upstream Toggle) */}
       <NodeToolbar
         isVisible={isHovered || data.selected}
         position={Position.Top}
+        align="start"
         offset={12}
       >
-        <div className="node-toolbar">
+        <div className="node-toolbar node-toolbar-left">
           <IconButton
             aria-label="Toggle upstream"
             onClick={() => data.onToggleUpstream?.()}
@@ -776,6 +777,17 @@ export function NodeCard({ data }: { data: NodeCardData }) {
           >
             {data.upstreamExpanded ? <MinusIcon /> : <PlusIcon />}
           </IconButton>
+        </div>
+      </NodeToolbar>
+
+      {/* NodeToolbar - Top Right (Downstream Toggle) */}
+      <NodeToolbar
+        isVisible={isHovered || data.selected}
+        position={Position.Top}
+        align="end"
+        offset={12}
+      >
+        <div className="node-toolbar node-toolbar-right">
           <IconButton
             aria-label="Toggle downstream"
             onClick={() => data.onToggleDownstream?.()}
@@ -785,7 +797,18 @@ export function NodeCard({ data }: { data: NodeCardData }) {
           >
             {data.downstreamExpanded ? <MinusIcon /> : <PlusIcon />}
           </IconButton>
-          {data.children && data.children.length > 0 && (
+        </div>
+      </NodeToolbar>
+
+      {/* NodeToolbar - Bottom Center (View/Hide Children) */}
+      {data.children && data.children.length > 0 && (
+        <NodeToolbar
+          isVisible={isHovered || data.selected}
+          position={Position.Bottom}
+          align="center"
+          offset={12}
+        >
+          <div className="node-toolbar node-toolbar-bottom">
             <IconButton
               aria-label={data.childrenExpanded ? "Hide columns" : "View children"}
               onClick={() => data.onToggleChildren?.()}
@@ -795,9 +818,9 @@ export function NodeCard({ data }: { data: NodeCardData }) {
             >
               {data.childrenExpanded ? 'Hide columns' : `${data.children.length} columns`}
             </IconButton>
-          )}
-        </div>
-      </NodeToolbar>
+          </div>
+        </NodeToolbar>
+      )}
 
       <div 
         className={`${nodeCard.base} ${typeStyle(data.objType)} ${data.selected ? 'selected' : ''}`}

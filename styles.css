@@ -168,7 +168,7 @@
   padding: 0 !important;
 }
 
-/* Node toolbar wrapper */
+/* Node toolbar wrapper - base styles */
 .node-toolbar {
   display: flex;
   gap: var(--space-2);
@@ -178,14 +178,39 @@
   border-radius: var(--radius-lg);
   padding: var(--space-2);
   box-shadow: var(--shadow);
-  transform: translateY(-4px);
-  transition: transform 200ms ease-out;
   pointer-events: auto;
+  transition: opacity 200ms ease-in-out, transform 200ms ease-out;
 }
 
-/* Animate toolbar position when visible */
-.react-flow__node-toolbar[data-visible="true"] .node-toolbar {
-  transform: translateY(0);
+/* Top toolbars - slide down animation */
+.node-toolbar-left,
+.node-toolbar-right {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* Bottom toolbar - slide up animation */
+.node-toolbar-bottom {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+/* Show toolbars when visible */
+.react-flow__node-toolbar[data-visible="true"] .node-toolbar-left {
+  opacity: 1;
+  transform: translateY(0) translateX(-8px);
+  transition-delay: 100ms;
+}
+
+.react-flow__node-toolbar[data-visible="true"] .node-toolbar-right {
+  opacity: 1;
+  transform: translateY(0) translateX(8px);
+  transition-delay: 100ms;
+}
+
+.react-flow__node-toolbar[data-visible="true"] .node-toolbar-bottom {
+  opacity: 1;
+  transform: translateY(0) translateY(8px);
   transition-delay: 100ms;
 }
 
@@ -196,22 +221,11 @@
   transform: scale(0.9);
 }
 
-/* Staggered button appearance */
+/* Button appears when toolbar is visible */
 .react-flow__node-toolbar[data-visible="true"] .node-toolbar .nc-button {
   opacity: 1;
   transform: scale(1);
-}
-
-.react-flow__node-toolbar[data-visible="true"] .node-toolbar .nc-button:nth-child(1) {
   transition-delay: 150ms;
-}
-
-.react-flow__node-toolbar[data-visible="true"] .node-toolbar .nc-button:nth-child(2) {
-  transition-delay: 180ms;
-}
-
-.react-flow__node-toolbar[data-visible="true"] .node-toolbar .nc-button:nth-child(3) {
-  transition-delay: 210ms;
 }
 
 /* =============================================================================
