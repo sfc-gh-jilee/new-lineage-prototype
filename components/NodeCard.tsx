@@ -904,19 +904,32 @@ export function NodeCard({ data }: { data: NodeCardData }) {
               overflow: isAutoExpanded ? 'visible' : 'auto'
             }}
             onWheel={(e) => {
-              // Prevent event from bubbling up to ReactFlow
-              e.stopPropagation();
-              e.preventDefault();
-              
               // Clear column lineage when user scrolls
               data.onClearColumnLineage?.();
               
-              // Only handle manual scrolling if not auto-expanded
+              // Only handle scrolling if not auto-expanded and the list is scrollable
               if (!isAutoExpanded) {
                 const target = e.currentTarget;
                 const scrollAmount = e.deltaY;
-                target.scrollTop += scrollAmount;
+                const isScrollable = target.scrollHeight > target.clientHeight;
+                
+                if (isScrollable) {
+                  const isAtTop = target.scrollTop === 0 && scrollAmount < 0;
+                  const isAtBottom = Math.abs(target.scrollTop + target.clientHeight - target.scrollHeight) < 1 && scrollAmount > 0;
+                  
+                  // Only prevent propagation if we're scrolling within the list bounds
+                  if (!isAtTop && !isAtBottom) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    target.scrollTop += scrollAmount;
+                  }
+                  // If at top/bottom, let the event propagate to ReactFlow for canvas panning
+                } else {
+                  // If not scrollable, let the event propagate to ReactFlow
+                  // Don't stop propagation or prevent default
+                }
               }
+              // If auto-expanded, let the event propagate to ReactFlow
             }}
           >
             {data.children
