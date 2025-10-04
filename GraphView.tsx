@@ -24,6 +24,7 @@ import { customEdgeTypes } from './components/CustomEdge';
 import { NodeCard, type NodeCardData } from './components/NodeCard';
 import { GraphProvider, useGraphVisibility } from './context/GraphContext';
 import { useExpand } from './hooks/useLineage';
+import { useHistory, type HistoryState } from './hooks/useHistory';
 import { elkLayout } from './lib/elkLayout';
 import { ALL_EDGES, NODE_BY_ID, ROOT_NODE_ID, COLUMN_LINEAGE, ALL_NODES } from './lib/mockData';
 import type { LineageNode } from './lib/types';
@@ -183,8 +184,85 @@ function LineageCanvasInner() {
   });
   const [showFilterPopover, setShowFilterPopover] = useState(false);
 
+  const [selectedChildrenByNode, setSelectedChildrenByNode] = useState<Record<string, Set<string>>>({});
+  const [focusedColumn, setFocusedColumn] = useState<{
+    nodeId: string;
+    columnName: string;
+  } | null>(null);
+  const [selectedColumnLineage, setSelectedColumnLineage] = useState<{
+    nodeId: string;
+    columnName: string;
+  } | null>(null);
+  const [hoveredColumnLineage, setHoveredColumnLineage] = useState<{
+    nodeId: string;
+    columnName: string;
+  } | null>(null);
+  const [showAllChildren, setShowAllChildren] = useState<boolean>(false);
+
+  const { fitView, getViewport, setViewport } = useReactFlow();
+  const nodesRef = useRef<Node<NodeCardData>[]>([]);
+  const edgesRef = useRef<Edge<EdgeData>[]>([]);
+  useEffect(() => void (nodesRef.current = rfNodes), [rfNodes]);
+  useEffect(() => void (edgesRef.current = rfEdges), [rfEdges]);
+
+  // Undo/Redo history
+  const { canUndo, canRedo, undo, redo, pushState, getCurrentState } = useHistory();
+  const isRestoringStateRef = useRef(false);
+
+  // Capture current state for history
+  const captureState = useCallback((): HistoryState => {
+    const nodePositions: Record<string, { x: number; y: number }> = {};
+    rfNodes.forEach(node => {
+      nodePositions[node.id] = { x: node.position.x, y: node.position.y };
+    });
+
+    return {
+      nodePositions,
+      visibleNodeIds: new Set(visibleNodeIds),
+      expandedUpstreamByNode: Object.fromEntries(
+        Object.entries(expandedUpstreamByNode).map(([k, v]) => [k, new Set(v)])
+      ),
+      expandedDownstreamByNode: Object.fromEntries(
+        Object.entries(expandedDownstreamByNode).map(([k, v]) => [k, new Set(v)])
+      ),
+      viewport: getViewport()
+    };
+  }, [rfNodes, visibleNodeIds, expandedUpstreamByNode, expandedDownstreamByNode, getViewport]);
+
+  // Restore state from history
+  const restoreState = useCallback((state: HistoryState) => {
+    isRestoringStateRef.current = true;
+
+    // Restore visible nodes
+    setVisibleNodeIds(state.visibleNodeIds);
+
+    // Restore expansion states
+    setExpandedUpstreamByNode(state.expandedUpstreamByNode);
+    setExpandedDownstreamByNode(state.expandedDownstreamByNode);
+
+    // Restore node positions
+    setRfNodes(nodes => 
+      nodes.map(node => ({
+        ...node,
+        position: state.nodePositions[node.id] || node.position
+      }))
+    );
+
+    // Restore viewport
+    setViewport(state.viewport, { duration: 200 });
+
+    setTimeout(() => {
+      isRestoringStateRef.current = false;
+    }, 300);
+  }, [setVisibleNodeIds, setExpandedUpstreamByNode, setExpandedDownstreamByNode, setRfNodes, setViewport]);
+
   // Custom nodes change handler to support group dragging
   const handleNodesChange = useCallback((changes: any[]) => {
+    // Check if drag just ended (position change with dragging: false)
+    const dragEndChanges = changes.filter(change => 
+      change.type === 'position' && change.dragging === false
+    );
+    
     // Handle group dragging for multi-selected nodes
     const dragChanges = changes.filter(change => change.type === 'position' && change.dragging);
     
@@ -230,27 +308,45 @@ function LineageCanvasInner() {
       // Normal single node dragging
       onNodesChange(changes);
     }
-  }, [onNodesChange, selectedNodeIds, rfNodes]);
-  const [selectedChildrenByNode, setSelectedChildrenByNode] = useState<Record<string, Set<string>>>({});
-  const [focusedColumn, setFocusedColumn] = useState<{
-    nodeId: string;
-    columnName: string;
-  } | null>(null);
-  const [selectedColumnLineage, setSelectedColumnLineage] = useState<{
-    nodeId: string;
-    columnName: string;
-  } | null>(null);
-  const [hoveredColumnLineage, setHoveredColumnLineage] = useState<{
-    nodeId: string;
-    columnName: string;
-  } | null>(null);
-  const [showAllChildren, setShowAllChildren] = useState<boolean>(false);
 
-  const { fitView, getViewport, setViewport } = useReactFlow();
-  const nodesRef = useRef<Node<NodeCardData>[]>([]);
-  const edgesRef = useRef<Edge<EdgeData>[]>([]);
-  useEffect(() => void (nodesRef.current = rfNodes), [rfNodes]);
-  useEffect(() => void (edgesRef.current = rfEdges), [rfEdges]);
+    // Capture state after drag ends
+    if (dragEndChanges.length > 0 && !isRestoringStateRef.current) {
+      setTimeout(() => {
+        pushState(captureState());
+      }, 100);
+    }
+  }, [onNodesChange, selectedNodeIds, rfNodes, captureState, pushState]);
+
+  // Handle undo/redo when history index changes
+  useEffect(() => {
+    const state = getCurrentState();
+    if (state && !isRestoringStateRef.current) {
+      restoreState(state);
+    }
+  }, [getCurrentState, restoreState]);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+Z or Ctrl+Z for undo
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (canUndo) {
+          undo();
+        }
+      }
+      // Cmd+Shift+Z or Ctrl+Shift+Z for redo
+      else if ((e.metaKey || e.ctrlKey) && e.key === 'z' && e.shiftKey) {
+        e.preventDefault();
+        if (canRedo) {
+          redo();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [canUndo, canRedo, undo, redo]);
 
   // Custom scroll-to-pan implementation with momentum
   const reactFlowWrapperRef = useRef<HTMLDivElement>(null);
@@ -606,6 +702,11 @@ function LineageCanvasInner() {
 
   const handleExpand = useCallback(
     (nodeId: string, dir: 'up' | 'down') => {
+      // Capture state before expand (if not restoring)
+      if (!isRestoringStateRef.current) {
+        pushState(captureState());
+      }
+      
       const parent = nodesRef.current.find((n) => n.id === nodeId);
       if (!parent) return;
       expandMutation.mutate(
@@ -692,11 +793,18 @@ function LineageCanvasInner() {
       setRfEdges,
       expandMutation,
       buildRfEdges,
+      pushState,
+      captureState,
     ],
   );
 
   const handleCollapse = useCallback(
     (nodeId: string, dir: 'up' | 'down') => {
+      // Capture state before collapse (if not restoring)
+      if (!isRestoringStateRef.current) {
+        pushState(captureState());
+      }
+      
       const record =
         dir === 'up'
           ? expandedUpstreamByNode[nodeId] || new Set<string>()
@@ -765,6 +873,8 @@ function LineageCanvasInner() {
       setExpandedDownstreamByNode,
       setRfNodes,
       setRfEdges,
+      pushState,
+      captureState,
     ],
   );
 
