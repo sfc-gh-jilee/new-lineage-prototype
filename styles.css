@@ -75,20 +75,20 @@
   line-height: var(--leading-normal);
   pointer-events: none;
   z-index: var(--z-max);
+  background: var(--bg-primary);
 }
 
 .popover-data-quality {
-  background: var(--bg-primary);
+  background-color: #ffffff !important; /* White background for better visibility */
   box-shadow: 0 4px 16px rgba(25, 30, 36, 0.2);
+  border: 1px solid var(--border-color);
 }
 
 .popover-error {
-  background: var(--bg-primary);
   border: 1px solid var(--red-200);
 }
 
 .popover-warning {
-  background: var(--bg-primary);
   border: 1px solid var(--yellow-200);
 }
 
@@ -180,12 +180,12 @@
 
 /* Top left toolbar - slide from top-left */
 .node-toolbar-left {
-  transform: translateY(14px) translateX(-8px);
+  transform: translateY(0) translateX(-8px);
 }
 
 /* Top right toolbar - slide from top-right */
 .node-toolbar-right {
-  transform: translateY(14px) translateX(8px);
+  transform: translateY(0) translateX(8px);
 }
 
 /* Bottom toolbar - slide from bottom */
@@ -213,8 +213,8 @@
 
 /* Edge label card (the small icon badge) */
 .edge-label-card {
-  background: var(--level2-background-color);
-  border: 1px solid var(--border-color);
+  background: #F7F9FB;
+  /* border: 1px solid var(--border-color); */
   border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
@@ -228,10 +228,12 @@
 }
 
 .edge-label-card:hover {
+  background-color: var(--level2-background-color);
   border: 1px solid var(--border-hover);
 }
 
 .edge-label-card.selected {
+  background-color: var(--level2-background-color);
   border: 2px solid var(--border-active);
 }
 
@@ -482,7 +484,7 @@ body {
   width: 6px !important;
   height: 6px !important;
   border-radius: 50% !important;
-  top: 26px !important;
+  /* top: 26px !important; */
 }
 
 .react-flow__handle-top {
