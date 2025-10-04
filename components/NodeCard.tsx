@@ -820,7 +820,7 @@ export function NodeCard({ data }: { data: NodeCardData }) {
       <NodeToolbar
         isVisible={true}
         position={Position.Left}
-        align="start"
+        align="center"
         offset={0}
       >
         <div 
@@ -831,7 +831,10 @@ export function NodeCard({ data }: { data: NodeCardData }) {
         >
           <IconButton
             aria-label="Toggle upstream"
-            onClick={() => data.onToggleUpstream?.()}
+            onClick={() => {
+              console.log('🔵 Upstream button clicked', data.id, data.upstreamExpanded);
+              data.onToggleUpstream?.();
+            }}
             size="sm"
             variant="icon"
             level="nodecard"
@@ -845,7 +848,7 @@ export function NodeCard({ data }: { data: NodeCardData }) {
       <NodeToolbar
         isVisible={true}
         position={Position.Right}
-        align="start"
+        align="center"
         offset={0}
       >
         <div 
@@ -856,7 +859,10 @@ export function NodeCard({ data }: { data: NodeCardData }) {
         >
           <IconButton
             aria-label="Toggle downstream"
-            onClick={() => data.onToggleDownstream?.()}
+            onClick={() => {
+              console.log('🔴 Downstream button clicked', data.id, data.downstreamExpanded);
+              data.onToggleDownstream?.();
+            }}
             size="sm"
             variant="icon"
             level="nodecard"

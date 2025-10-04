@@ -910,11 +910,13 @@ function LineageCanvasInner() {
           onToggleUpstream: () => {
             // Read current state to avoid stale closure values
             const isCurrentlyExpanded = !!expandedUpstreamByNode[n.id]?.size;
+            console.log('⬆️ Toggle upstream handler', n.id, 'currently expanded:', isCurrentlyExpanded);
             isCurrentlyExpanded ? handleCollapse(n.id, 'up') : handleExpand(n.id, 'up');
           },
           onToggleDownstream: () => {
             // Read current state to avoid stale closure values
             const isCurrentlyExpanded = !!expandedDownstreamByNode[n.id]?.size;
+            console.log('⬇️ Toggle downstream handler', n.id, 'currently expanded:', isCurrentlyExpanded);
             isCurrentlyExpanded ? handleCollapse(n.id, 'down') : handleExpand(n.id, 'down');
           },
           onToggleChildren: () => {
