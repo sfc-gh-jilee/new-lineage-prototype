@@ -412,20 +412,12 @@ function CombinedErrorWarningIcon({ error, warning }: { error?: string | string[
       {/* Combined Popover - rendered via portal */}
       {showPopover && createPortal(
         <div
-          className="error-warning-popover"
+          className="error-warning-popover popover-base"
           style={{
             position: 'fixed',
             top: `${popoverPosition.top}px`,
             left: `${popoverPosition.left}px`,
             transform: 'translateX(-50%)',
-            background: '#fbfbfb',
-            borderRadius: 6,
-            padding: 12,
-            boxShadow: '0 4px 16px rgba(25, 30, 36, 0.2)',
-            minWidth: 200,
-            maxWidth: 300,
-            fontSize: 12,
-            pointerEvents: 'none',
             zIndex: 9999,
           }}
         >
@@ -550,20 +542,12 @@ function ErrorWarningIcon({ type, message }: { type: 'error' | 'warning'; messag
         {/* Popover - rendered via portal */}
         {showPopover && createPortal(
           <div
-            className="error-warning-popover"
+            className="error-warning-popover popover-base popover-error"
             style={{
               position: 'fixed',
               top: `${popoverPosition.top}px`,
               left: `${popoverPosition.left}px`,
               transform: 'translateX(-50%)',
-              background: '#fbfbfb',
-              borderRadius: 6,
-              padding: 12,
-              boxShadow: '0 4px 16px rgba(25, 30, 36, 0.2)',
-              minWidth: 200,
-              maxWidth: 300,
-              fontSize: 12,
-              pointerEvents: 'none',
               zIndex: 9999,
             }}
           >
@@ -613,20 +597,12 @@ function ErrorWarningIcon({ type, message }: { type: 'error' | 'warning'; messag
       {/* Popover - rendered via portal */}
       {showPopover && createPortal(
         <div
-          className="error-warning-popover"
+          className="error-warning-popover popover-base popover-warning"
           style={{
             position: 'fixed',
             top: `${popoverPosition.top}px`,
             left: `${popoverPosition.left}px`,
             transform: 'translateX(-50%)',
-            background: '#fbfbfb',
-            borderRadius: 6,
-            padding: 12,
-            boxShadow: '0 4px 16px rgba(25, 30, 36, 0.2)',
-            minWidth: 200,
-            maxWidth: 300,
-            fontSize: 12,
-            pointerEvents: 'none',
             zIndex: 9999,
           }}
         >
