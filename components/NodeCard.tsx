@@ -910,24 +910,14 @@ export function NodeCard({ data }: { data: NodeCardData }) {
               // Only handle scrolling if not auto-expanded and the list is scrollable
               if (!isAutoExpanded) {
                 const target = e.currentTarget;
-                const scrollAmount = e.deltaY;
                 const isScrollable = target.scrollHeight > target.clientHeight;
                 
                 if (isScrollable) {
-                  const isAtTop = target.scrollTop === 0 && scrollAmount < 0;
-                  const isAtBottom = Math.abs(target.scrollTop + target.clientHeight - target.scrollHeight) < 1 && scrollAmount > 0;
-                  
-                  // Only prevent propagation if we're scrolling within the list bounds
-                  if (!isAtTop && !isAtBottom) {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    target.scrollTop += scrollAmount;
-                  }
-                  // If at top/bottom, let the event propagate to ReactFlow for canvas panning
-                } else {
-                  // If not scrollable, let the event propagate to ReactFlow
-                  // Don't stop propagation or prevent default
+                  // Stop propagation to prevent ReactFlow from panning
+                  // Let the browser handle the native scroll (don't preventDefault)
+                  e.stopPropagation();
                 }
+                // If not scrollable, let the event propagate to ReactFlow for canvas panning
               }
               // If auto-expanded, let the event propagate to ReactFlow
             }}
