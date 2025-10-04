@@ -114,7 +114,7 @@ export function CustomEdge({
             }}
           >
             <div
-              className="edge-label-card"
+              className={`edge-label-card ${isSelected ? 'selected' : ''}`}
               title={specialEdge.description}
             >
               <img 

@@ -170,8 +170,8 @@
 
 /* Edge label card (the small icon badge) */
 .edge-label-card {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-secondary);
+  background: var(--level2-background-color);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
@@ -182,13 +182,23 @@
   white-space: nowrap;
   height: 24px;
   width: 24px;
-  box-shadow: var(--shadow-sm);
   transition: all 0.2s ease;
 }
 
 .edge-label-card:hover {
-  background: var(--bg-secondary);
-  box-shadow: var(--shadow);
+  background: var(--level2-background-color);
+  border: 1px solid var(--border-hover);
+}
+
+.edge-label-card.selected {
+  background: var(--green-50);
+  border: 1px solid var(--green-500);
+  box-shadow: 0 0 0 2px var(--green-100);
+}
+
+.edge-label-card.selected .edge-label-icon {
+  filter: none;
+  opacity: 1;
 }
 
 /* Edge label icon */
