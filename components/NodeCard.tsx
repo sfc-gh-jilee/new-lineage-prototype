@@ -762,12 +762,12 @@ export function NodeCard({ data }: { data: NodeCardData }) {
     <>
       {/* NodeToolbar - Top Left (Upstream Toggle) */}
       <NodeToolbar
-        isVisible={isHovered || data.selected}
+        isVisible={true}
         position={Position.Top}
         align="start"
         offset={12}
       >
-        <div className="node-toolbar node-toolbar-left">
+        <div className="node-toolbar node-toolbar-left" style={{ opacity: (isHovered || data.selected) ? 1 : 0 }}>
           <IconButton
             aria-label="Toggle upstream"
             onClick={() => data.onToggleUpstream?.()}
@@ -782,12 +782,12 @@ export function NodeCard({ data }: { data: NodeCardData }) {
 
       {/* NodeToolbar - Top Right (Downstream Toggle) */}
       <NodeToolbar
-        isVisible={isHovered || data.selected}
+        isVisible={true}
         position={Position.Top}
         align="end"
         offset={12}
       >
-        <div className="node-toolbar node-toolbar-right">
+        <div className="node-toolbar node-toolbar-right" style={{ opacity: (isHovered || data.selected) ? 1 : 0 }}>
           <IconButton
             aria-label="Toggle downstream"
             onClick={() => data.onToggleDownstream?.()}
@@ -803,12 +803,12 @@ export function NodeCard({ data }: { data: NodeCardData }) {
       {/* NodeToolbar - Bottom Center (View/Hide Children) */}
       {data.children && data.children.length > 0 && (
         <NodeToolbar
-          isVisible={isHovered || data.selected}
+          isVisible={true}
           position={Position.Bottom}
           align="center"
           offset={12}
         >
-          <div className="node-toolbar node-toolbar-bottom">
+          <div className="node-toolbar node-toolbar-bottom" style={{ opacity: (isHovered || data.selected) ? 1 : 0 }}>
             <IconButton
               aria-label={data.childrenExpanded ? "Hide columns" : "View children"}
               onClick={() => data.onToggleChildren?.()}
@@ -824,8 +824,14 @@ export function NodeCard({ data }: { data: NodeCardData }) {
 
       <div 
         className={`${nodeCard.base} ${typeStyle(data.objType)} ${data.selected ? 'selected' : ''}`}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        onMouseEnter={() => {
+          console.log('Node hover START', data.id);
+          setIsHovered(true);
+        }}
+        onMouseLeave={() => {
+          console.log('Node hover END', data.id);
+          setIsHovered(false);
+        }}
       >
         <div className={nodeCard.type}>
           <TypeIcon type={data.objType} />

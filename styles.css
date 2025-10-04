@@ -179,53 +179,27 @@
   padding: var(--space-2);
   box-shadow: var(--shadow);
   pointer-events: auto;
-  transition: opacity 200ms ease-in-out, transform 200ms ease-out;
+  transition: opacity 200ms ease-in-out 100ms, transform 200ms ease-out 100ms;
 }
 
-/* Top toolbars - slide down animation */
-.node-toolbar-left,
+/* Top left toolbar - slide from top-left */
+.node-toolbar-left {
+  transform: translateY(-8px) translateX(-8px);
+}
+
+/* Top right toolbar - slide from top-right */
 .node-toolbar-right {
-  opacity: 0;
-  transform: translateY(-8px);
+  transform: translateY(-8px) translateX(8px);
 }
 
-/* Bottom toolbar - slide up animation */
+/* Bottom toolbar - slide from bottom */
 .node-toolbar-bottom {
-  opacity: 0;
   transform: translateY(8px);
-}
-
-/* Show toolbars when visible */
-.react-flow__node-toolbar[data-visible="true"] .node-toolbar-left {
-  opacity: 1;
-  transform: translateY(0) translateX(-8px);
-  transition-delay: 100ms;
-}
-
-.react-flow__node-toolbar[data-visible="true"] .node-toolbar-right {
-  opacity: 1;
-  transform: translateY(0) translateX(8px);
-  transition-delay: 100ms;
-}
-
-.react-flow__node-toolbar[data-visible="true"] .node-toolbar-bottom {
-  opacity: 1;
-  transform: translateY(0) translateY(8px);
-  transition-delay: 100ms;
 }
 
 /* Individual button animations in toolbar */
 .node-toolbar .nc-button {
-  transition: all 0.12s ease, opacity 200ms ease-in-out, transform 200ms ease-out;
-  opacity: 0;
-  transform: scale(0.9);
-}
-
-/* Button appears when toolbar is visible */
-.react-flow__node-toolbar[data-visible="true"] .node-toolbar .nc-button {
-  opacity: 1;
-  transform: scale(1);
-  transition-delay: 150ms;
+  transition: all 0.12s ease;
 }
 
 /* =============================================================================
