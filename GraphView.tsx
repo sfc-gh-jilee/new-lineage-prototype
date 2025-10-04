@@ -318,21 +318,17 @@ function LineageCanvasInner() {
     }
   }, [onNodesChange, selectedNodeIds, rfNodes, captureState, pushState]);
 
-  // Handle undo/redo when canUndo/canRedo changes (indicates index changed)
+  // Handle undo/redo - DISABLED auto-restore to prevent interference with expand/collapse
+  // Undo/redo only triggered by keyboard shortcuts (Cmd+Z / Cmd+Shift+Z)
   useEffect(() => {
     const state = getCurrentState();
     if (!state) return;
     
-    // Check if this is a new history navigation
+    // Update last state ref but DON'T auto-restore
+    // This was causing expand/collapse to immediately undo itself
     const currentHistoryState = JSON.stringify(state);
-    const lastHistoryState = lastHistoryStateRef.current;
-    
-    if (currentHistoryState !== lastHistoryState && !isRestoringStateRef.current) {
-      console.log('🔄 Restoring state from history');
-      lastHistoryStateRef.current = currentHistoryState;
-      restoreState(state);
-    }
-  }, [canUndo, canRedo, getCurrentState, restoreState]);
+    lastHistoryStateRef.current = currentHistoryState;
+  }, [canUndo, canRedo, getCurrentState]);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
@@ -342,6 +338,14 @@ function LineageCanvasInner() {
         e.preventDefault();
         if (canUndo) {
           undo();
+          // Restore state after undo
+          setTimeout(() => {
+            const state = getCurrentState();
+            if (state) {
+              console.log('🔄 Restoring state after undo');
+              restoreState(state);
+            }
+          }, 10);
         }
       }
       // Cmd+Shift+Z or Ctrl+Shift+Z for redo
@@ -349,13 +353,21 @@ function LineageCanvasInner() {
         e.preventDefault();
         if (canRedo) {
           redo();
+          // Restore state after redo
+          setTimeout(() => {
+            const state = getCurrentState();
+            if (state) {
+              console.log('🔄 Restoring state after redo');
+              restoreState(state);
+            }
+          }, 10);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [canUndo, canRedo, undo, redo]);
+  }, [canUndo, canRedo, undo, redo, getCurrentState, restoreState]);
 
   // Custom scroll-to-pan implementation with momentum
   const reactFlowWrapperRef = useRef<HTMLDivElement>(null);
