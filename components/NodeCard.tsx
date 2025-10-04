@@ -332,10 +332,18 @@ function DataQualityRating({ score }: { score: number }) {
 function CombinedErrorWarningIcon({ error, warning }: { error?: string | string[]; warning?: string | string[] }) {
   const [showPopover, setShowPopover] = useState(false);
   const [hoverTimeout, setHoverTimeout] = useState<number | null>(null);
+  const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleMouseEnter = () => {
     const timeout = window.setTimeout(() => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setPopoverPosition({
+          top: rect.bottom + 8,
+          left: rect.left + rect.width / 2,
+        });
+      }
       setShowPopover(true);
     }, 400);
     setHoverTimeout(timeout);
@@ -401,16 +409,15 @@ function CombinedErrorWarningIcon({ error, warning }: { error?: string | string[
         </div>
       )}
       
-      {/* Combined Popover */}
-      {showPopover && (
+      {/* Combined Popover - rendered via portal */}
+      {showPopover && createPortal(
         <div
           className="error-warning-popover"
           style={{
-            position: 'absolute',
-            top: '100%',
-            left: '50%',
+            position: 'fixed',
+            top: `${popoverPosition.top}px`,
+            left: `${popoverPosition.left}px`,
             transform: 'translateX(-50%)',
-            marginTop: 8,
             background: '#fbfbfb',
             borderRadius: 6,
             padding: 12,
@@ -419,6 +426,7 @@ function CombinedErrorWarningIcon({ error, warning }: { error?: string | string[
             maxWidth: 300,
             fontSize: 12,
             pointerEvents: 'none',
+            zIndex: 9999,
           }}
         >
           {/* Error Section */}
@@ -470,7 +478,8 @@ function CombinedErrorWarningIcon({ error, warning }: { error?: string | string[
             </div>
           )}
           
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -479,10 +488,18 @@ function CombinedErrorWarningIcon({ error, warning }: { error?: string | string[
 function ErrorWarningIcon({ type, message }: { type: 'error' | 'warning'; message: string | string[] }) {
   const [showPopover, setShowPopover] = useState(false);
   const [hoverTimeout, setHoverTimeout] = useState<number | null>(null);
+  const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleMouseEnter = () => {
     const timeout = window.setTimeout(() => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setPopoverPosition({
+          top: rect.bottom + 8,
+          left: rect.left + rect.width / 2,
+        });
+      }
       setShowPopover(true);
     }, 400);
     setHoverTimeout(timeout);
@@ -530,16 +547,15 @@ function ErrorWarningIcon({ type, message }: { type: 'error' | 'warning'; messag
           {hasMultiple && <span> +{additionalCount}</span>}
         </span>
         
-        {/* Popover */}
-        {showPopover && (
+        {/* Popover - rendered via portal */}
+        {showPopover && createPortal(
           <div
             className="error-warning-popover"
             style={{
-              position: 'absolute',
-              top: '100%',
-              left: '50%',
+              position: 'fixed',
+              top: `${popoverPosition.top}px`,
+              left: `${popoverPosition.left}px`,
               transform: 'translateX(-50%)',
-              marginTop: 8,
               background: '#fbfbfb',
               borderRadius: 6,
               padding: 12,
@@ -548,6 +564,7 @@ function ErrorWarningIcon({ type, message }: { type: 'error' | 'warning'; messag
               maxWidth: 300,
               fontSize: 12,
               pointerEvents: 'none',
+              zIndex: 9999,
             }}
           >
             <div style={{ fontWeight: 600, marginBottom: 8, color: '#1e252f', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -568,7 +585,8 @@ function ErrorWarningIcon({ type, message }: { type: 'error' | 'warning'; messag
             <div style={{ color: '#5d6a85', fontSize: 12, lineHeight: 1.5, marginTop: 8 }}>
               {hasMultiple ? 'These errors may impact data quality and should be addressed.' : 'This error may impact data quality and should be addressed.'}
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     );
@@ -592,24 +610,24 @@ function ErrorWarningIcon({ type, message }: { type: 'error' | 'warning'; messag
         {hasMultiple && <span> +{additionalCount}</span>}
       </span>
       
-      {/* Popover */}
-      {showPopover && (
+      {/* Popover - rendered via portal */}
+      {showPopover && createPortal(
         <div
+          className="error-warning-popover"
           style={{
-            position: 'absolute',
-            top: '100%',
-            left: '50%',
+            position: 'fixed',
+            top: `${popoverPosition.top}px`,
+            left: `${popoverPosition.left}px`,
             transform: 'translateX(-50%)',
-            marginTop: 8,
             background: '#fbfbfb',
             borderRadius: 6,
             padding: 12,
             boxShadow: '0 4px 16px rgba(25, 30, 36, 0.2)',
-            zIndex: 1000,
             minWidth: 200,
             maxWidth: 300,
             fontSize: 12,
             pointerEvents: 'none',
+            zIndex: 9999,
           }}
         >
           <div style={{ fontWeight: 600, marginBottom: 8, color: '#1e252f', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -629,7 +647,8 @@ function ErrorWarningIcon({ type, message }: { type: 'error' | 'warning'; messag
           <div style={{ color: '#5d6a85', fontSize: 12, lineHeight: 1.5, marginTop: 8 }}>
             {hasMultiple ? 'These warnings should be reviewed to ensure data quality.' : 'This warning should be reviewed to ensure data quality.'}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
