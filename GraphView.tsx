@@ -907,10 +907,16 @@ function LineageCanvasInner() {
           multiSelected: isMultiSelected,
           selectedChildren,
           focusedChild,
-          onToggleUpstream: () =>
-            upstreamExpanded ? handleCollapse(n.id, 'up') : handleExpand(n.id, 'up'),
-          onToggleDownstream: () =>
-            downstreamExpanded ? handleCollapse(n.id, 'down') : handleExpand(n.id, 'down'),
+          onToggleUpstream: () => {
+            // Read current state to avoid stale closure values
+            const isCurrentlyExpanded = !!expandedUpstreamByNode[n.id]?.size;
+            isCurrentlyExpanded ? handleCollapse(n.id, 'up') : handleExpand(n.id, 'up');
+          },
+          onToggleDownstream: () => {
+            // Read current state to avoid stale closure values
+            const isCurrentlyExpanded = !!expandedDownstreamByNode[n.id]?.size;
+            isCurrentlyExpanded ? handleCollapse(n.id, 'down') : handleExpand(n.id, 'down');
+          },
           onToggleChildren: () => {
             // Toggle children expansion state
             const newChildrenExpanded = !n.data.childrenExpanded;
