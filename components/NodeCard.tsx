@@ -898,28 +898,15 @@ export function NodeCard({ data }: { data: NodeCardData }) {
             </div>
           </div>
           <div 
-            className="children-list"
+            className="children-list nopan nodrag"
             style={{ 
               maxHeight: isAutoExpanded ? 'none' : `${childrenListHeight}px`,
-              overflow: isAutoExpanded ? 'visible' : 'auto'
+              overflow: isAutoExpanded ? 'visible' : 'auto',
+              overflowY: isAutoExpanded ? 'visible' : 'auto'
             }}
-            onWheel={(e) => {
+            onWheel={() => {
               // Clear column lineage when user scrolls
               data.onClearColumnLineage?.();
-              
-              // Only handle scrolling if not auto-expanded and the list is scrollable
-              if (!isAutoExpanded) {
-                const target = e.currentTarget;
-                const isScrollable = target.scrollHeight > target.clientHeight;
-                
-                if (isScrollable) {
-                  // Stop propagation to prevent ReactFlow from panning
-                  // Let the browser handle the native scroll (don't preventDefault)
-                  e.stopPropagation();
-                }
-                // If not scrollable, let the event propagate to ReactFlow for canvas panning
-              }
-              // If auto-expanded, let the event propagate to ReactFlow
             }}
           >
             {data.children

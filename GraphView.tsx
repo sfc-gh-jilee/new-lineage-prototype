@@ -252,6 +252,118 @@ function LineageCanvasInner() {
   useEffect(() => void (nodesRef.current = rfNodes), [rfNodes]);
   useEffect(() => void (edgesRef.current = rfEdges), [rfEdges]);
 
+  // Custom scroll-to-pan implementation with momentum
+  const reactFlowWrapperRef = useRef<HTMLDivElement>(null);
+  const momentumRef = useRef({ vx: 0, vy: 0, timestamp: Date.now() });
+  const rafRef = useRef<number>();
+
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      // Check if the target is within a scrollable children-list
+      const target = e.target as HTMLElement;
+      const scrollableElement = target.closest('.children-list');
+      
+      if (scrollableElement && !scrollableElement.classList.contains('auto-expanded')) {
+        const list = scrollableElement as HTMLElement;
+        const isScrollable = list.scrollHeight > list.clientHeight;
+        
+        if (isScrollable) {
+          // Check if we're at scroll boundaries
+          const atTop = list.scrollTop <= 0 && e.deltaY < 0;
+          const atBottom = Math.abs(list.scrollTop + list.clientHeight - list.scrollHeight) < 1 && e.deltaY > 0;
+          
+          if (!atTop && !atBottom) {
+            // Allow the list to scroll naturally
+            return;
+          }
+        }
+      }
+      
+      // Pan the canvas
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const viewport = getViewport();
+      const panSpeed = 0.5; // Reduced for smoother feel
+      
+      // Calculate new position
+      const deltaX = e.deltaX * panSpeed;
+      const deltaY = e.deltaY * panSpeed;
+      
+      // Update viewport immediately for responsive feel
+      setViewport({
+        x: viewport.x - deltaX,
+        y: viewport.y - deltaY,
+        zoom: viewport.zoom
+      }, { duration: 0 });
+      
+      // Update momentum for inertial scrolling
+      const now = Date.now();
+      const timeDelta = now - momentumRef.current.timestamp;
+      
+      if (timeDelta > 0) {
+        // Calculate velocity (pixels per millisecond)
+        momentumRef.current.vx = deltaX / timeDelta;
+        momentumRef.current.vy = deltaY / timeDelta;
+        momentumRef.current.timestamp = now;
+      }
+      
+      // Cancel any ongoing momentum animation
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+      
+      // Start momentum animation after a short delay
+      setTimeout(() => {
+        applyMomentum();
+      }, 100);
+    };
+    
+    const applyMomentum = () => {
+      const friction = 0.92; // Adjust for more/less momentum (lower = more friction)
+      const minVelocity = 0.01; // Stop when velocity is very small
+      
+      const momentum = momentumRef.current;
+      
+      // Apply friction
+      momentum.vx *= friction;
+      momentum.vy *= friction;
+      
+      // Check if momentum is still significant
+      if (Math.abs(momentum.vx) > minVelocity || Math.abs(momentum.vy) > minVelocity) {
+        const viewport = getViewport();
+        
+        // Apply momentum
+        setViewport({
+          x: viewport.x - momentum.vx * 16, // Multiply by ~16ms (60fps frame time)
+          y: viewport.y - momentum.vy * 16,
+          zoom: viewport.zoom
+        }, { duration: 0 });
+        
+        // Continue animation
+        rafRef.current = requestAnimationFrame(applyMomentum);
+      } else {
+        // Stop animation
+        momentum.vx = 0;
+        momentum.vy = 0;
+      }
+    };
+    
+    const wrapper = reactFlowWrapperRef.current;
+    if (wrapper) {
+      wrapper.addEventListener('wheel', handleWheel, { passive: false });
+    }
+    
+    return () => {
+      if (wrapper) {
+        wrapper.removeEventListener('wheel', handleWheel);
+      }
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, [getViewport, setViewport]);
+
   // Force ReactFlow to properly initialize event handlers and center the view
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1161,7 +1273,7 @@ function LineageCanvasInner() {
     <>
       <div style={{ display: 'flex', height: '100vh', width: '100%' }}>
         {/* Main ReactFlow Container */}
-        <div style={{ flex: 1, position: 'relative' }}>
+        <div ref={reactFlowWrapperRef} style={{ flex: 1, position: 'relative' }}>
           <ReactFlow
             nodes={rfNodesWithHandlers as any}
             edges={allEdges as any}
@@ -1179,8 +1291,8 @@ function LineageCanvasInner() {
             defaultEdgeOptions={{ animated: true, style: { cursor: 'pointer' } }}
             defaultViewport={{ x: 0, y: 0, zoom: 1 }}
             panOnDrag={true}
-            panOnScroll={true}
-            zoomOnScroll={true}
+            panOnScroll={false}
+            zoomOnScroll={false}
             zoomOnPinch={true}
             zoomOnDoubleClick={true}
           >
