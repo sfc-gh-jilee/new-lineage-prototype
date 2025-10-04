@@ -166,6 +166,7 @@
   border: none !important;
   box-shadow: none !important;
   padding: 0 !important;
+  z-index: 1000 !important; /* Below popovers but above node cards */
 }
 
 /* Node toolbar wrapper - base styles */
@@ -173,23 +174,18 @@
   display: flex;
   gap: var(--space-2);
   align-items: center;
-  background: var(--level2-background-color);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: var(--space-2);
-  box-shadow: var(--shadow);
   pointer-events: auto;
   transition: opacity 200ms ease-in-out 100ms, transform 200ms ease-out 100ms;
 }
 
 /* Top left toolbar - slide from top-left */
 .node-toolbar-left {
-  transform: translateY(-8px) translateX(-8px);
+  transform: translateY(14px) translateX(-8px);
 }
 
 /* Top right toolbar - slide from top-right */
 .node-toolbar-right {
-  transform: translateY(-8px) translateX(8px);
+  transform: translateY(14px) translateX(8px);
 }
 
 /* Bottom toolbar - slide from bottom */
@@ -342,11 +338,11 @@ body {
   box-shadow: 0 0 0 2px var(--blue-200);
 }
 
-/* Ensure popovers always appear above everything */
+/* Ensure popovers always appear above everything (including toolbars) */
 .error-warning-popover,
 .data-quality-popover,
 [data-popover="true"] {
-  z-index: var(--z-max) !important;
+  z-index: var(--z-max) !important; /* 9999 - highest priority */
   position: absolute !important;
 }
 
@@ -695,7 +691,7 @@ body {
 }
 
 .nc-button-secondary:hover:not(:disabled) {
-  background-color: var(--background-hover);
+  /* background-color: var(--background-hover); */
   border-color: var(--border-hover);
 }
 
