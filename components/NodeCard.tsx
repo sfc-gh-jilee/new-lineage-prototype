@@ -626,6 +626,7 @@ export function NodeCard({ data }: { data: NodeCardData }) {
   const [searchQuery, setSearchQuery] = useState<string>(''); // Search query for filtering columns
   const dragStartRef = useRef<{ y: number; height: number } | null>(null);
   const lastClickTimeRef = useRef<number>(0);
+  const [isHovered, setIsHovered] = useState(false);
 
   // Trigger ReactFlow layout recalculation when children list height changes
   useEffect(() => {
@@ -758,47 +759,57 @@ export function NodeCard({ data }: { data: NodeCardData }) {
   };
 
   return (
-    <div className={`${nodeCard.base} ${typeStyle(data.objType)} ${data.selected ? 'selected' : ''}`}>
-      <div className={nodeCard.type}>
-        <TypeIcon type={data.objType} />
-        {typeDisplay(data.objType)}
-      </div>
-      <div className={nodeCard.actions}>
-        <IconButton
-          aria-label="Toggle upstream"
-          onClick={() => data.onToggleUpstream?.()}
-          size="sm"
-          variant="icon"
-          level="nodecard"
-        >
-          {data.upstreamExpanded ? <MinusIcon /> : <PlusIcon />}
-        </IconButton>
-        <IconButton
-          aria-label="Toggle downstream"
-          onClick={() => data.onToggleDownstream?.()}
-          size="sm"
-          variant="icon"
-          level="nodecard"
-        >
-          {data.downstreamExpanded ? <MinusIcon /> : <PlusIcon />}
-        </IconButton>
-      </div>
-      
-      {/* View Children Button - appears on hover */}
-      {data.children && data.children.length > 0 && (
-        <div className="node-card-children-button">
+    <>
+      {/* NodeToolbar - floating toolbar on hover */}
+      <NodeToolbar
+        isVisible={isHovered || data.selected}
+        position={Position.Top}
+        offset={12}
+      >
+        <div className="node-toolbar">
           <IconButton
-            aria-label={data.childrenExpanded ? "Hide columns" : "View children"}
-            onClick={() => data.onToggleChildren?.()}
+            aria-label="Toggle upstream"
+            onClick={() => data.onToggleUpstream?.()}
             size="sm"
-            variant="secondary"
+            variant="icon"
             level="nodecard"
           >
-            {data.childrenExpanded ? 'Hide columns' : `${data.children.length} columns`}
+            {data.upstreamExpanded ? <MinusIcon /> : <PlusIcon />}
           </IconButton>
+          <IconButton
+            aria-label="Toggle downstream"
+            onClick={() => data.onToggleDownstream?.()}
+            size="sm"
+            variant="icon"
+            level="nodecard"
+          >
+            {data.downstreamExpanded ? <MinusIcon /> : <PlusIcon />}
+          </IconButton>
+          {data.children && data.children.length > 0 && (
+            <IconButton
+              aria-label={data.childrenExpanded ? "Hide columns" : "View children"}
+              onClick={() => data.onToggleChildren?.()}
+              size="sm"
+              variant="secondary"
+              level="nodecard"
+            >
+              {data.childrenExpanded ? 'Hide columns' : `${data.children.length} columns`}
+            </IconButton>
+          )}
         </div>
-      )}
-      <div className="node-card-header">
+      </NodeToolbar>
+
+      <div 
+        className={`${nodeCard.base} ${typeStyle(data.objType)} ${data.selected ? 'selected' : ''}`}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <div className={nodeCard.type}>
+          <TypeIcon type={data.objType} />
+          {typeDisplay(data.objType)}
+        </div>
+        
+        <div className="node-card-header">
         {data.brandIcon && (
           <img 
             src={data.brandIcon} 
@@ -1040,6 +1051,7 @@ export function NodeCard({ data }: { data: NodeCardData }) {
           zIndex: 10
         }}
       />
-    </div>
+      </div>
+    </>
   );
 }
