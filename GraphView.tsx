@@ -273,7 +273,9 @@ function LineageCanvasInner() {
           const atBottom = Math.abs(list.scrollTop + list.clientHeight - list.scrollHeight) < 1 && e.deltaY > 0;
           
           if (!atTop && !atBottom) {
-            // Allow the list to scroll naturally
+            // Allow the list to scroll naturally - stop propagation to prevent canvas pan
+            e.stopPropagation();
+            // Don't preventDefault - let browser handle native scroll
             return;
           }
         }
