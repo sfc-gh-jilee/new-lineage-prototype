@@ -627,6 +627,8 @@ export function NodeCard({ data }: { data: NodeCardData }) {
   const dragStartRef = useRef<{ y: number; height: number } | null>(null);
   const lastClickTimeRef = useRef<number>(0);
   const [isHovered, setIsHovered] = useState(false);
+  const [isToolbarHovered, setIsToolbarHovered] = useState(false);
+  const hoverTimeoutRef = useRef<number | null>(null);
 
   // Trigger ReactFlow layout recalculation when children list height changes
   useEffect(() => {
@@ -638,6 +640,60 @@ export function NodeCard({ data }: { data: NodeCardData }) {
       return () => clearTimeout(timer);
     }
   }, [childrenListHeight, isAutoExpanded, data.onLayoutChange, data.childrenExpanded]);
+
+  // Cleanup hover timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Handle node hover with delay
+  const handleNodeMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      console.log('Node hover START', data.id);
+      setIsHovered(true);
+    }, 200);
+  };
+
+  const handleNodeMouseLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      if (!isToolbarHovered) {
+        console.log('Node hover END', data.id);
+        setIsHovered(false);
+      }
+    }, 200);
+  };
+
+  // Handle toolbar hover
+  const handleToolbarMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    setIsToolbarHovered(true);
+    setIsHovered(true);
+  };
+
+  const handleToolbarMouseLeave = () => {
+    setIsToolbarHovered(false);
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsHovered(false);
+    }, 200);
+  };
+
+  // Determine if toolbars should be visible
+  const showToolbars = isHovered || isToolbarHovered || data.selected;
 
   const handleDoubleClick = () => {
     console.log('Double click detected'); // Debug log
@@ -763,11 +819,16 @@ export function NodeCard({ data }: { data: NodeCardData }) {
       {/* NodeToolbar - Top Left (Upstream Toggle) */}
       <NodeToolbar
         isVisible={true}
-        position={Position.Top}
+        position={Position.Left}
         align="start"
-        offset={12}
+        offset={0}
       >
-        <div className="node-toolbar node-toolbar-left" style={{ opacity: (isHovered || data.selected) ? 1 : 0 }}>
+        <div 
+          className="node-toolbar node-toolbar-left" 
+          style={{ opacity: showToolbars ? 1 : 0, pointerEvents: showToolbars ? 'auto' : 'none' }}
+          onMouseEnter={handleToolbarMouseEnter}
+          onMouseLeave={handleToolbarMouseLeave}
+        >
           <IconButton
             aria-label="Toggle upstream"
             onClick={() => data.onToggleUpstream?.()}
@@ -783,11 +844,16 @@ export function NodeCard({ data }: { data: NodeCardData }) {
       {/* NodeToolbar - Top Right (Downstream Toggle) */}
       <NodeToolbar
         isVisible={true}
-        position={Position.Top}
-        align="end"
-        offset={12}
+        position={Position.Right}
+        align="start"
+        offset={0}
       >
-        <div className="node-toolbar node-toolbar-right" style={{ opacity: (isHovered || data.selected) ? 1 : 0 }}>
+        <div 
+          className="node-toolbar node-toolbar-right" 
+          style={{ opacity: showToolbars ? 1 : 0, pointerEvents: showToolbars ? 'auto' : 'none' }}
+          onMouseEnter={handleToolbarMouseEnter}
+          onMouseLeave={handleToolbarMouseLeave}
+        >
           <IconButton
             aria-label="Toggle downstream"
             onClick={() => data.onToggleDownstream?.()}
@@ -806,9 +872,14 @@ export function NodeCard({ data }: { data: NodeCardData }) {
           isVisible={true}
           position={Position.Bottom}
           align="center"
-          offset={12}
+          offset={0}
         >
-          <div className="node-toolbar node-toolbar-bottom" style={{ opacity: (isHovered || data.selected) ? 1 : 0 }}>
+          <div 
+            className="node-toolbar node-toolbar-bottom" 
+            style={{ opacity: showToolbars ? 1 : 0, pointerEvents: showToolbars ? 'auto' : 'none' }}
+            onMouseEnter={handleToolbarMouseEnter}
+            onMouseLeave={handleToolbarMouseLeave}
+          >
             <IconButton
               aria-label={data.childrenExpanded ? "Hide columns" : "View children"}
               onClick={() => data.onToggleChildren?.()}
@@ -824,14 +895,8 @@ export function NodeCard({ data }: { data: NodeCardData }) {
 
       <div 
         className={`${nodeCard.base} ${typeStyle(data.objType)} ${data.selected ? 'selected' : ''}`}
-        onMouseEnter={() => {
-          console.log('Node hover START', data.id);
-          setIsHovered(true);
-        }}
-        onMouseLeave={() => {
-          console.log('Node hover END', data.id);
-          setIsHovered(false);
-        }}
+        onMouseEnter={handleNodeMouseEnter}
+        onMouseLeave={handleNodeMouseLeave}
       >
         <div className={nodeCard.type}>
           <TypeIcon type={data.objType} />
