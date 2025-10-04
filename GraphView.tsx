@@ -899,13 +899,10 @@ function LineageCanvasInner() {
 
   const rfNodesWithHandlers = useMemo(() => {
     return (rfNodes as Node<NodeCardData>[]).map((n) => {
-      // Check if the expanded nodes are actually visible
-      const upstreamNodes = expandedUpstreamByNode[n.id] || new Set<string>();
-      const downstreamNodes = expandedDownstreamByNode[n.id] || new Set<string>();
-      
-      // Only consider it "expanded" if the nodes exist AND are visible
-      const upstreamExpanded = Array.from(upstreamNodes).some(id => visibleNodeIds.has(id));
-      const downstreamExpanded = Array.from(downstreamNodes).some(id => visibleNodeIds.has(id));
+      // Use the expanded state already stored in node data (set by handleExpand/handleCollapse)
+      // This is the source of truth for UI state
+      const upstreamExpanded = (n.data as NodeCardData).upstreamExpanded || false;
+      const downstreamExpanded = (n.data as NodeCardData).downstreamExpanded || false;
       const selectedChildren = selectedChildrenByNode[n.id] || new Set<string>();
       const focusedChild = focusedColumn?.nodeId === n.id ? focusedColumn.columnName : undefined;
       const isMultiSelected = selectedNodeIds.has(n.id);
@@ -923,17 +920,15 @@ function LineageCanvasInner() {
           selectedChildren,
           focusedChild,
           onToggleUpstream: () => {
-            // Check if the expanded nodes are actually visible (not just tracked)
-            const upstreamNodes = expandedUpstreamByNode[n.id] || new Set<string>();
-            const isCurrentlyExpanded = Array.from(upstreamNodes).some(id => visibleNodeIds.has(id));
-            console.log('⬆️ Toggle upstream handler', n.id, 'currently expanded:', isCurrentlyExpanded, 'tracked nodes:', upstreamNodes.size, 'visible:', Array.from(upstreamNodes).filter(id => visibleNodeIds.has(id)).length);
+            // Use the node data as the source of truth for current state
+            const isCurrentlyExpanded = upstreamExpanded;
+            console.log('⬆️ Toggle upstream handler', n.id, 'currently expanded:', isCurrentlyExpanded);
             isCurrentlyExpanded ? handleCollapse(n.id, 'up') : handleExpand(n.id, 'up');
           },
           onToggleDownstream: () => {
-            // Check if the expanded nodes are actually visible (not just tracked)
-            const downstreamNodes = expandedDownstreamByNode[n.id] || new Set<string>();
-            const isCurrentlyExpanded = Array.from(downstreamNodes).some(id => visibleNodeIds.has(id));
-            console.log('⬇️ Toggle downstream handler', n.id, 'currently expanded:', isCurrentlyExpanded, 'tracked nodes:', downstreamNodes.size, 'visible:', Array.from(downstreamNodes).filter(id => visibleNodeIds.has(id)).length);
+            // Use the node data as the source of truth for current state
+            const isCurrentlyExpanded = downstreamExpanded;
+            console.log('⬇️ Toggle downstream handler', n.id, 'currently expanded:', isCurrentlyExpanded);
             isCurrentlyExpanded ? handleCollapse(n.id, 'down') : handleExpand(n.id, 'down');
           },
           onToggleChildren: () => {
