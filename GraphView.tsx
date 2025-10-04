@@ -716,6 +716,7 @@ function LineageCanvasInner() {
         pushState(captureState());
       }
       
+      console.log('🔓 handleExpand called', nodeId, dir);
       const parent = nodesRef.current.find((n) => n.id === nodeId);
       if (!parent) return;
       expandMutation.mutate(
@@ -724,7 +725,9 @@ function LineageCanvasInner() {
           onSuccess: ({ ids }) => {
             const currentVisible = new Set(visibleNodeIds);
             const toAdd = ids.filter((id) => !currentVisible.has(id));
+            console.log('🔓 handleExpand onSuccess', nodeId, dir, 'found:', ids.length, 'toAdd:', toAdd.length);
             if (toAdd.length === 0) {
+              console.log('⚠️ No new nodes to add - all already visible. Just updating expanded flag.');
               setRfNodes(
                 (curr) =>
                   curr.map((cn) =>
@@ -744,6 +747,7 @@ function LineageCanvasInner() {
               );
               return;
             }
+            console.log('✅ Adding nodes to visible:', toAdd);
             const positions = placeNeighbors(parent, toAdd.length, dir);
             const newNodes = toAdd.map((id, i) => {
               const base = NODE_BY_ID.get(id)!;
@@ -814,12 +818,15 @@ function LineageCanvasInner() {
         pushState(captureState());
       }
       
+      console.log('🔒 handleCollapse called', nodeId, dir);
       const record =
         dir === 'up'
           ? expandedUpstreamByNode[nodeId] || new Set<string>()
           : expandedDownstreamByNode[nodeId] || new Set<string>();
       const toRemove = new Set(record);
+      console.log('🔒 Nodes to remove:', Array.from(toRemove));
       if (toRemove.size === 0) {
+        console.log('⚠️ No nodes in tracking to remove. Just updating collapsed flag.');
         setRfNodes(
           (curr) =>
             curr.map((cn) =>
@@ -841,14 +848,17 @@ function LineageCanvasInner() {
       }
       const nextVisible = new Set(visibleNodeIds);
       for (const id of toRemove) nextVisible.delete(id);
+      console.log('✅ Removing from visible, new count:', nextVisible.size);
       setVisibleNodeIds(nextVisible);
       if (dir === 'up') {
         const copy = { ...expandedUpstreamByNode };
         delete copy[nodeId];
+        console.log('✅ Deleting upstream tracking for', nodeId);
         setExpandedUpstreamByNode(copy);
       } else {
         const copy = { ...expandedDownstreamByNode };
         delete copy[nodeId];
+        console.log('✅ Deleting downstream tracking for', nodeId);
         setExpandedDownstreamByNode(copy);
       }
       setRfNodes(
