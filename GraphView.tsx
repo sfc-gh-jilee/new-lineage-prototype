@@ -208,6 +208,7 @@ function LineageCanvasInner() {
   // Undo/Redo history
   const { canUndo, canRedo, undo, redo, pushState, getCurrentState } = useHistory();
   const isRestoringStateRef = useRef(false);
+  const lastHistoryStateRef = useRef<string>('');
 
   // Capture current state for history
   const captureState = useCallback((): HistoryState => {
@@ -317,13 +318,21 @@ function LineageCanvasInner() {
     }
   }, [onNodesChange, selectedNodeIds, rfNodes, captureState, pushState]);
 
-  // Handle undo/redo when history index changes
+  // Handle undo/redo when canUndo/canRedo changes (indicates index changed)
   useEffect(() => {
     const state = getCurrentState();
-    if (state && !isRestoringStateRef.current) {
+    if (!state) return;
+    
+    // Check if this is a new history navigation
+    const currentHistoryState = JSON.stringify(state);
+    const lastHistoryState = lastHistoryStateRef.current;
+    
+    if (currentHistoryState !== lastHistoryState && !isRestoringStateRef.current) {
+      console.log('🔄 Restoring state from history');
+      lastHistoryStateRef.current = currentHistoryState;
       restoreState(state);
     }
-  }, [getCurrentState, restoreState]);
+  }, [canUndo, canRedo, getCurrentState, restoreState]);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
