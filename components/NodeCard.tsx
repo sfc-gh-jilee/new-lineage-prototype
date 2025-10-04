@@ -1,6 +1,6 @@
 import { IconButton } from './IconButton';
 import React, { useState, useRef, useEffect } from 'react';
-import { Handle, Position } from 'reactflow';
+import { Handle, Position, NodeToolbar } from 'reactflow';
 import type { ObjType, ColumnMetadata } from '../lib/types';
 import { colors, nodeCard } from '../styles';
 import { tokens } from '../lib/tokens';
