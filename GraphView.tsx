@@ -727,7 +727,19 @@ function LineageCanvasInner() {
             const toAdd = ids.filter((id) => !currentVisible.has(id));
             console.log('🔓 handleExpand onSuccess', nodeId, dir, 'found:', ids.length, 'toAdd:', toAdd.length);
             if (toAdd.length === 0) {
-              console.log('⚠️ No new nodes to add - all already visible. Just updating expanded flag.');
+              console.log('⚠️ No new nodes to add - all already visible. Updating expanded flag and tracking.');
+              // Still need to update tracking state even though nodes are already visible
+              if (dir === 'up') {
+                setExpandedUpstreamByNode((m) => ({
+                  ...m,
+                  [nodeId]: new Set(ids), // Track all found nodes
+                }));
+              } else {
+                setExpandedDownstreamByNode((m) => ({
+                  ...m,
+                  [nodeId]: new Set(ids), // Track all found nodes
+                }));
+              }
               setRfNodes(
                 (curr) =>
                   curr.map((cn) =>
