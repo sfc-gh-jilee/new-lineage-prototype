@@ -268,16 +268,13 @@ function LineageCanvasInner() {
         const isScrollable = list.scrollHeight > list.clientHeight;
         
         if (isScrollable) {
-          // Check if we're at scroll boundaries
-          const atTop = list.scrollTop <= 0 && e.deltaY < 0;
-          const atBottom = Math.abs(list.scrollTop + list.clientHeight - list.scrollHeight) < 1 && e.deltaY > 0;
+          // Always scroll the list when hovering over it (stable behavior)
+          e.stopPropagation();
+          e.preventDefault();
           
-          if (!atTop && !atBottom) {
-            // Allow the list to scroll naturally - stop propagation to prevent canvas pan
-            e.stopPropagation();
-            // Don't preventDefault - let browser handle native scroll
-            return;
-          }
+          // Manually update scroll position
+          list.scrollTop += e.deltaY;
+          return;
         }
       }
       
