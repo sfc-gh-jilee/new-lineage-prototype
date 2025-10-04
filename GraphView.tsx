@@ -1140,6 +1140,17 @@ function LineageCanvasInner() {
   const onNodeClick: NodeMouseHandler = useCallback((event, node) => {
     setDrawerEdge(null);
     
+    // Clear edge selection
+    setRfEdges(edges => 
+      edges.map(e => ({
+        ...e,
+        data: {
+          ...e.data,
+          isSelected: false
+        }
+      }))
+    );
+    
     const isCtrlOrCmdPressed = event.ctrlKey || event.metaKey;
     
     if (isCtrlOrCmdPressed) {
@@ -1192,7 +1203,7 @@ function LineageCanvasInner() {
       setSelectedChildrenByNode({});
       setSelectedColumnLineage(null);
     }
-  }, [selectedNodeId, selectedNodeIds, rfNodes]);
+  }, [selectedNodeId, selectedNodeIds, rfNodes, setRfEdges]);
   const onEdgeClick = useCallback((_: React.MouseEvent, edge: Edge<any>) => {
     setDrawerNode(null);
     setDrawerEdge(edge);
@@ -1201,7 +1212,18 @@ function LineageCanvasInner() {
     setSelectedChildrenByNode({}); // Clear all selected children
     setSelectedColumnLineage(null); // Clear column lineage
     setHoveredColumnLineage(null); // Clear hovered column lineage
-  }, []);
+    
+    // Update edges to mark this one as selected
+    setRfEdges(edges => 
+      edges.map(e => ({
+        ...e,
+        data: {
+          ...e.data,
+          isSelected: e.id === edge.id
+        }
+      }))
+    );
+  }, [setRfEdges]);
   
   const onPaneClick = useCallback(() => {
     setDrawerNode(null);
@@ -1212,7 +1234,18 @@ function LineageCanvasInner() {
     setSelectedColumnLineage(null); // Clear column lineage
     setHoveredColumnLineage(null); // Clear hovered column lineage
     setFocusedColumn(null); // Clear focused column
-  }, []);
+    
+    // Clear edge selection
+    setRfEdges(edges => 
+      edges.map(e => ({
+        ...e,
+        data: {
+          ...e.data,
+          isSelected: false
+        }
+      }))
+    );
+  }, [setRfEdges]);
   const closeDrawer = useCallback(() => {
     setDrawerNode(null);
     setDrawerEdge(null);
