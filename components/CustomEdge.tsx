@@ -108,55 +108,31 @@ export function CustomEdge({
       {shouldShowLabel && (
         <EdgeLabelRenderer>
           <div
+            className="edge-label-container nodrag nopan"
             style={{
-              position: 'absolute',
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-              fontSize: 12,
-              lineHeight: 1.5,
-              fontWeight: 600,
-              pointerEvents: 'all',
             }}
-            className="nodrag nopan"
           >
             <div
-              style={{
-                background: '#FBFBFB',
-                border: '1px solid #d5dae4',
-                borderRadius: 8,
-                // padding: '0 8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 4,
-                color: '#1e252f',
-                minWidth: 'fit-content',
-                whiteSpace: 'nowrap',
-                height: '24px',
-                width: '24px'
-              }}
+              className="edge-label-card"
               title={specialEdge.description}
-              >
-                <img 
-                  src={specialEdge.icon} 
-                  alt={`${specialEdge.label} icon`}
-                  style={{ 
-                    width: 12, 
-                    height: 12, 
-                    objectFit: 'contain',
-                    filter: 'grayscale(100%)', // Make icons grayscale for consistency
-                  }}
-                  onError={(e) => {
-                    // Fallback to text if image fails to load
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                    const fallback = target.nextElementSibling as HTMLElement;
-                    if (fallback) fallback.style.display = 'inline';
-                  }}
-                />
-                <span style={{ fontSize: 12, fontWeight: 400, margin: '0 8px', display: 'none' }}>
-                  {specialEdge.label}
-                </span>
-              </div>
+            >
+              <img 
+                src={specialEdge.icon} 
+                alt={`${specialEdge.label} icon`}
+                className="edge-label-icon"
+                onError={(e) => {
+                  // Fallback to text if image fails to load
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const fallback = target.nextElementSibling as HTMLElement;
+                  if (fallback) fallback.style.display = 'inline';
+                }}
+              />
+              <span className="edge-label-text">
+                {specialEdge.label}
+              </span>
+            </div>
           </div>
         </EdgeLabelRenderer>
       )}
