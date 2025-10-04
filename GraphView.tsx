@@ -1179,8 +1179,8 @@ function LineageCanvasInner() {
             defaultEdgeOptions={{ animated: true, style: { cursor: 'pointer' } }}
             defaultViewport={{ x: 0, y: 0, zoom: 1 }}
             panOnDrag={true}
-            panOnScroll={false}
-            zoomOnScroll={false}
+            panOnScroll={true}
+            zoomOnScroll={true}
             zoomOnPinch={true}
             zoomOnDoubleClick={true}
           >
