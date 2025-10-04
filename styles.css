@@ -65,17 +65,18 @@
   left: 50%;
   transform: translateX(-50%);
   margin-top: var(--space-2);
-  background: var(--bg-secondary);
+  background: #ffffff;
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: var(--space-3);
   box-shadow: var(--shadow);
   min-width: 200px;
-  max-width: 250px;
+  max-width: 300px;
   font-size: var(--text-sm);
   line-height: var(--leading-normal);
   pointer-events: none;
   z-index: var(--z-max);
-  background: var(--bg-primary);
+  font-family: 'Inter', sans-serif;
 }
 
 .popover-data-quality {
