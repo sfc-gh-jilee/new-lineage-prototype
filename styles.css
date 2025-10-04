@@ -191,9 +191,7 @@
 }
 
 .edge-label-card.selected {
-  background: var(--green-50);
-  border: 1px solid var(--green-500);
-  box-shadow: 0 0 0 2px var(--green-100);
+  border: 2px solid var(--border-active);
 }
 
 .edge-label-card.selected .edge-label-icon {
