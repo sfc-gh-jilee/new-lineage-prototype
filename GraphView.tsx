@@ -662,9 +662,17 @@ function LineageCanvasInner() {
     setExpandedDownstreamByNode(newExpandedDownstream);
     setShowAllChildren(false);
     
-    // Create all nodes with default positions
+    // Create all nodes with correct expanded state
     const allRfNodes = ALL_NODES.map(node => {
-      const rfNode = makeRfNode({ ...node, upstreamExpanded: false, downstreamExpanded: false });
+      // Since all nodes are visible, set expanded flags based on tracking
+      const hasUpstream = (newExpandedUpstream[node.id]?.size || 0) > 0;
+      const hasDownstream = (newExpandedDownstream[node.id]?.size || 0) > 0;
+      
+      const rfNode = makeRfNode({ 
+        ...node, 
+        upstreamExpanded: hasUpstream,  // True if has upstream connections
+        downstreamExpanded: hasDownstream  // True if has downstream connections
+      });
       rfNode.position = { x: 0, y: 0 }; // ELK will position them
       return rfNode;
     });
