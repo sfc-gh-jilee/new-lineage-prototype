@@ -852,6 +852,22 @@ export function NodeCard({ data }: { data: NodeCardData }) {
           >
             {data.upstreamExpanded ? <MinusIcon /> : <PlusIcon />}
           </IconButton>
+          <IconButton
+            aria-label="Upstream actions"
+            onClick={() => {
+              console.log('⚙️ Upstream actions clicked', data.id);
+              // TODO: Show dropdown menu
+            }}
+            size="sm"
+            variant="icon"
+            level="nodecard"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <circle cx="8" cy="3" r="1.5" />
+              <circle cx="8" cy="8" r="1.5" />
+              <circle cx="8" cy="13" r="1.5" />
+            </svg>
+          </IconButton>
         </div>
       </NodeToolbar>
 
@@ -879,6 +895,22 @@ export function NodeCard({ data }: { data: NodeCardData }) {
             level="nodecard"
           >
             {data.downstreamExpanded ? <MinusIcon /> : <PlusIcon />}
+          </IconButton>
+          <IconButton
+            aria-label="Downstream actions"
+            onClick={() => {
+              console.log('⚙️ Downstream actions clicked', data.id);
+              // TODO: Show dropdown menu
+            }}
+            size="sm"
+            variant="icon"
+            level="nodecard"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <circle cx="8" cy="3" r="1.5" />
+              <circle cx="8" cy="8" r="1.5" />
+              <circle cx="8" cy="13" r="1.5" />
+            </svg>
           </IconButton>
         </div>
       </NodeToolbar>
