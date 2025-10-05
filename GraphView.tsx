@@ -1153,7 +1153,23 @@ function LineageCanvasInner() {
             .filter((cn) => !toRemove.has(cn.id) && cn.id !== groupNodeId) as any, // Also filter out group node
       );
       setRfEdges((curr) =>
-        curr.filter((e) => !toRemove.has(e.source as string) && !toRemove.has(e.target as string) && e.source !== groupNodeId && e.target !== groupNodeId),
+        curr.filter((e) => {
+          const sourceRemoved = toRemove.has(e.source as string) || e.source === groupNodeId;
+          const targetRemoved = toRemove.has(e.target as string) || e.target === groupNodeId;
+          const sourceIsCollapsedNode = e.source === nodeId;
+          const targetIsCollapsedNode = e.target === nodeId;
+          
+          // Remove edge if:
+          // 1. It connects to/from the collapsed node AND the other end is being removed
+          // 2. Both ends are being removed
+          // Keep edge if:
+          // - Only one end is being removed but the other end is still visible (not the collapsed node)
+          if (sourceIsCollapsedNode && targetRemoved) return false; // collapsed -> removed
+          if (targetIsCollapsedNode && sourceRemoved) return false; // removed -> collapsed
+          if (sourceRemoved && targetRemoved) return false; // both removed
+          
+          return true; // Keep all other edges
+        }),
       );
     },
     [
