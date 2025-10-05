@@ -1052,7 +1052,12 @@ function LineageCanvasInner() {
               edgeCount: edges.length,
               edges: edges.map(e => `${e.source} -> ${e.target}`)
             });
-            setRfEdges(edges as any);
+            // Merge with existing edges to preserve edges from promoted nodes
+            setRfEdges((currentEdges) => {
+              const edgeMap = new Map(currentEdges.map(e => [e.id, e]));
+              edges.forEach(e => edgeMap.set(e.id, e));
+              return Array.from(edgeMap.values()) as any;
+            });
           },
         },
       );
