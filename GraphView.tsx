@@ -1011,8 +1011,9 @@ function LineageCanvasInner() {
             
             setVisibleNodeIds(currentVisible);
             
-            // Track which nodes were actually added (visible nodes only, not grouped ones)
-            const nodesToTrack = Array.from(currentVisible).filter(id => id !== nodeId);
+            // Track which nodes were actually added by THIS expand operation
+            // This should only include the nodes we just made visible, not all visible nodes
+            const nodesToTrack = newNodes.map(n => n.id);
             
             if (dir === 'up') {
               setExpandedUpstreamByNode((m) => ({
