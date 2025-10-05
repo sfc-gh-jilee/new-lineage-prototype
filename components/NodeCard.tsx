@@ -638,13 +638,11 @@ function ErrorWarningIcon({ type, message }: { type: 'error' | 'warning'; messag
 // Mini Card with Tooltip
 function MiniCardWithTooltip({ node, onPromote }: { node: any; onPromote: () => void }) {
   const [showTooltip, setShowTooltip] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
   const [hoverTimeout, setHoverTimeout] = useState<number | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleMouseEnter = () => {
-    setIsFocused(true);
     const timeout = window.setTimeout(() => {
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
@@ -659,7 +657,6 @@ function MiniCardWithTooltip({ node, onPromote }: { node: any; onPromote: () => 
   };
 
   const handleMouseLeave = () => {
-    setIsFocused(false);
     if (hoverTimeout) {
       window.clearTimeout(hoverTimeout);
       setHoverTimeout(null);
@@ -688,7 +685,7 @@ function MiniCardWithTooltip({ node, onPromote }: { node: any; onPromote: () => 
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`group-node-mini-card ${isFocused ? 'focused' : ''}`}
+        className="group-node-mini-card"
       >
         <TypeIcon type={node.objType} />
       </div>
