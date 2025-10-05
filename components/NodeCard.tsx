@@ -640,6 +640,11 @@ export function NodeCard({ data }: { data: NodeCardData }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isToolbarHovered, setIsToolbarHovered] = useState(false);
   const hoverTimeoutRef = useRef<number | null>(null);
+  const [showUpstreamMenu, setShowUpstreamMenu] = useState(false);
+  const [showDownstreamMenu, setShowDownstreamMenu] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+  const upstreamMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const downstreamMenuButtonRef = useRef<HTMLButtonElement>(null);
 
   // Trigger ReactFlow layout recalculation when children list height changes
   useEffect(() => {
@@ -705,6 +710,48 @@ export function NodeCard({ data }: { data: NodeCardData }) {
 
   // Determine if toolbars should be visible
   const showToolbars = isHovered || isToolbarHovered || data.selected;
+
+  // Handle overflow menu clicks
+  const handleUpstreamMenuClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (upstreamMenuButtonRef.current) {
+      const rect = upstreamMenuButtonRef.current.getBoundingClientRect();
+      setMenuPosition({
+        top: rect.bottom + 4,
+        left: rect.left,
+      });
+    }
+    setShowUpstreamMenu(!showUpstreamMenu);
+    setShowDownstreamMenu(false);
+  };
+
+  const handleDownstreamMenuClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (downstreamMenuButtonRef.current) {
+      const rect = downstreamMenuButtonRef.current.getBoundingClientRect();
+      setMenuPosition({
+        top: rect.bottom + 4,
+        left: rect.left,
+      });
+    }
+    setShowDownstreamMenu(!showDownstreamMenu);
+    setShowUpstreamMenu(false);
+  };
+
+  // Close menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showUpstreamMenu || showDownstreamMenu) {
+        setShowUpstreamMenu(false);
+        setShowDownstreamMenu(false);
+      }
+    };
+    
+    if (showUpstreamMenu || showDownstreamMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showUpstreamMenu, showDownstreamMenu]);
 
   const handleDoubleClick = () => {
     console.log('Double click detected'); // Debug log
@@ -840,6 +887,21 @@ export function NodeCard({ data }: { data: NodeCardData }) {
           onMouseEnter={handleToolbarMouseEnter}
           onMouseLeave={handleToolbarMouseLeave}
         >
+            <div ref={upstreamMenuButtonRef as any}>
+              <IconButton
+                aria-label="Upstream actions"
+                onClick={handleUpstreamMenuClick}
+                size="sm"
+                variant="icon"
+                level="nodecard"
+              >
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                  <circle cx="3" cy="8" r="1.5" />
+                  <circle cx="8" cy="8" r="1.5" />
+                  <circle cx="13" cy="8" r="1.5" />
+                </svg>
+              </IconButton>
+            </div>
           <IconButton
             aria-label="Toggle upstream"
             onClick={() => {
@@ -851,22 +913,6 @@ export function NodeCard({ data }: { data: NodeCardData }) {
             level="nodecard"
           >
             {data.upstreamExpanded ? <MinusIcon /> : <PlusIcon />}
-          </IconButton>
-          <IconButton
-            aria-label="Upstream actions"
-            onClick={() => {
-              console.log('⚙️ Upstream actions clicked', data.id);
-              // TODO: Show dropdown menu
-            }}
-            size="sm"
-            variant="icon"
-            level="nodecard"
-          >
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-              <circle cx="3" cy="8" r="1.5" />
-              <circle cx="8" cy="8" r="1.5" />
-              <circle cx="13" cy="8" r="1.5" />
-            </svg>
           </IconButton>
         </div>
       </NodeToolbar>
@@ -896,22 +942,21 @@ export function NodeCard({ data }: { data: NodeCardData }) {
           >
             {data.downstreamExpanded ? <MinusIcon /> : <PlusIcon />}
           </IconButton>
-          <IconButton
-            aria-label="Downstream actions"
-            onClick={() => {
-              console.log('⚙️ Downstream actions clicked', data.id);
-              // TODO: Show dropdown menu
-            }}
-            size="sm"
-            variant="icon"
-            level="nodecard"
-          >
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-              <circle cx="3" cy="8" r="1.5" />
-              <circle cx="8" cy="8" r="1.5" />
-              <circle cx="13" cy="8" r="1.5" />
-            </svg>
-          </IconButton>
+          <div ref={downstreamMenuButtonRef as any}>
+            <IconButton
+              aria-label="Downstream actions"
+              onClick={handleDownstreamMenuClick}
+              size="sm"
+              variant="icon"
+              level="nodecard"
+            >
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                <circle cx="3" cy="8" r="1.5" />
+                <circle cx="8" cy="8" r="1.5" />
+                <circle cx="13" cy="8" r="1.5" />
+              </svg>
+            </IconButton>
+          </div>
         </div>
       </NodeToolbar>
 
@@ -1195,6 +1240,93 @@ export function NodeCard({ data }: { data: NodeCardData }) {
         }}
       />
       </div>
+
+      {/* Overflow Menu Popovers */}
+      {showUpstreamMenu && createPortal(
+        <div
+          className="overflow-menu popover-base"
+          style={{
+            position: 'fixed',
+            top: `${menuPosition.top}px`,
+            left: `${menuPosition.left}px`,
+            transform: 'none',
+            zIndex: 9999,
+            minWidth: '180px',
+            pointerEvents: 'auto',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div 
+            className="overflow-menu-item"
+            onClick={() => {
+              console.log('Search upstream nodes', data.id);
+              setShowUpstreamMenu(false);
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: 8 }}>
+              <circle cx="7" cy="7" r="5" stroke="currentColor" fill="none" strokeWidth="1.5"/>
+              <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            Search upstream nodes
+          </div>
+          <div 
+            className="overflow-menu-item"
+            onClick={() => {
+              console.log('Add new upstream node', data.id);
+              setShowUpstreamMenu(false);
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: 8 }}>
+              <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            Add new node
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showDownstreamMenu && createPortal(
+        <div
+          className="overflow-menu popover-base"
+          style={{
+            position: 'fixed',
+            top: `${menuPosition.top}px`,
+            left: `${menuPosition.left}px`,
+            transform: 'none',
+            zIndex: 9999,
+            minWidth: '180px',
+            pointerEvents: 'auto',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div 
+            className="overflow-menu-item"
+            onClick={() => {
+              console.log('Search downstream nodes', data.id);
+              setShowDownstreamMenu(false);
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: 8 }}>
+              <circle cx="7" cy="7" r="5" stroke="currentColor" fill="none" strokeWidth="1.5"/>
+              <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            Search downstream nodes
+          </div>
+          <div 
+            className="overflow-menu-item"
+            onClick={() => {
+              console.log('Add new downstream node', data.id);
+              setShowDownstreamMenu(false);
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: 8 }}>
+              <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            Add new node
+          </div>
+        </div>,
+        document.body
+      )}
     </>
   );
 }

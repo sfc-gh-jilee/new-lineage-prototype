@@ -90,6 +90,31 @@
   border: 1px solid var(--yellow-200);
 }
 
+/* Overflow Menu */
+.overflow-menu {
+  padding: var(--space-1);
+}
+
+.overflow-menu-item {
+  display: flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  transition: background-color 0.15s ease;
+  user-select: none;
+}
+
+.overflow-menu-item:hover {
+  background-color: var(--level2-background-color);
+}
+
+.overflow-menu-item svg {
+  flex-shrink: 0;
+}
+
 /* Interactive Element Utilities */
 .interactive-help {
   position: relative;
