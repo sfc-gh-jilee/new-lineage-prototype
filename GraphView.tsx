@@ -26,7 +26,7 @@ import { GraphProvider, useGraphVisibility } from './context/GraphContext';
 import { useExpand } from './hooks/useLineage';
 import { useHistory, type HistoryState } from './hooks/useHistory';
 import { elkLayout } from './lib/elkLayout';
-import { ALL_EDGES, NODE_BY_ID, ROOT_NODE_ID, TEST_ROOT_NODE_ID, COLUMN_LINEAGE, ALL_NODES } from './lib/mockData';
+import { ALL_EDGES, NODE_BY_ID, COLUMN_LINEAGE, ALL_NODES } from './lib/mockData';
 import type { LineageNode } from './lib/types';
 import { container } from './styles.stylex';
 
@@ -159,7 +159,7 @@ function findRelatedColumns(nodeId: string, columnName: string) {
   return relatedColumns;
 }
 
-function LineageCanvasInner({ rootNodeId = ROOT_NODE_ID }: { rootNodeId?: string }) {
+function LineageCanvasInner() {
   const {
     visibleNodeIds,
     setVisibleNodeIds,
@@ -506,7 +506,6 @@ function LineageCanvasInner({ rootNodeId = ROOT_NODE_ID }: { rootNodeId?: string
     return () => clearTimeout(timer);
   }, [setViewport]);
 
-  const didInit = useRef(false);
   const expandMutation = useExpand();
 
   const placeNeighbors = (
@@ -652,75 +651,76 @@ function LineageCanvasInner({ rootNodeId = ROOT_NODE_ID }: { rootNodeId?: string
     }
   }, [rfNodes, rfEdges, visibleNodeIds, setRfNodes]);
 
-  const initializeAllNodes = useCallback(async () => {
-    // Set all nodes as visible
-    const allNodeIds = new Set(ALL_NODES.map(node => node.id));
-    setVisibleNodeIds(allNodeIds);
-    
-    // Build expanded state tracking - since all nodes are visible, 
-    // we need to track which nodes have their upstream/downstream "expanded"
-    const newExpandedUpstream: Record<string, Set<string>> = {};
-    const newExpandedDownstream: Record<string, Set<string>> = {};
-    
-    // For each edge, mark the source as having downstream expanded and target as having upstream expanded
-    ALL_EDGES.forEach(edge => {
-      // Source node has downstream expanded (showing its target)
-      if (!newExpandedDownstream[edge.source]) {
-        newExpandedDownstream[edge.source] = new Set();
-      }
-      newExpandedDownstream[edge.source].add(edge.target);
-      
-      // Target node has upstream expanded (showing its source)
-      if (!newExpandedUpstream[edge.target]) {
-        newExpandedUpstream[edge.target] = new Set();
-      }
-      newExpandedUpstream[edge.target].add(edge.source);
-    });
-    
-    setExpandedUpstreamByNode(newExpandedUpstream);
-    setExpandedDownstreamByNode(newExpandedDownstream);
-    setShowAllChildren(false);
-    
-    // Create all nodes with correct expanded state
-    const allRfNodes = ALL_NODES.map(node => {
-      // Since all nodes are visible, set expanded flags based on tracking
-      const hasUpstream = (newExpandedUpstream[node.id]?.size || 0) > 0;
-      const hasDownstream = (newExpandedDownstream[node.id]?.size || 0) > 0;
-      
-      const rfNode = makeRfNode({ 
-        ...node, 
-        upstreamExpanded: hasUpstream,  // True if has upstream connections
-        downstreamExpanded: hasDownstream  // True if has downstream connections
-      });
-      rfNode.position = { x: 0, y: 0 }; // ELK will position them
-      return rfNode;
-    });
-    
-    // Create all edges
-    const allRfEdges = buildRfEdges(allNodeIds);
-    
-    // Set nodes and edges
-    setRfNodes(allRfNodes as any);
-    setRfEdges(allRfEdges as any);
-    
-    // Apply ELK layout to position all nodes properly
-    try {
-      const laidOutNodes = await elkLayout(allRfNodes as any, allRfEdges as any, 'RIGHT', false); // Use normal spacing, not expansion spacing
-      setRfNodes(laidOutNodes as any);
-      setTimeout(() => fitView({ padding: 0.1, includeHiddenNodes: false }), 150); // Fit all visible nodes with 10% padding
-    } catch (error) {
-      console.error('Failed to apply ELK layout:', error);
-      setTimeout(() => fitView({ padding: 0.1, includeHiddenNodes: false }), 100);
-    }
-  }, [
-    setVisibleNodeIds,
-    setExpandedUpstreamByNode,
-    setExpandedDownstreamByNode,
-    setRfNodes,
-    setRfEdges,
-    buildRfEdges,
-    fitView,
-  ]);
+  // Commented out - not currently used, but kept for future reference
+  // const initializeAllNodes = useCallback(async () => {
+  //   // Set all nodes as visible
+  //   const allNodeIds = new Set(ALL_NODES.map(node => node.id));
+  //   setVisibleNodeIds(allNodeIds);
+  //   
+  //   // Build expanded state tracking - since all nodes are visible, 
+  //   // we need to track which nodes have their upstream/downstream "expanded"
+  //   const newExpandedUpstream: Record<string, Set<string>> = {};
+  //   const newExpandedDownstream: Record<string, Set<string>> = {};
+  //   
+  //   // For each edge, mark the source as having downstream expanded and target as having upstream expanded
+  //   ALL_EDGES.forEach(edge => {
+  //     // Source node has downstream expanded (showing its target)
+  //     if (!newExpandedDownstream[edge.source]) {
+  //       newExpandedDownstream[edge.source] = new Set();
+  //     }
+  //     newExpandedDownstream[edge.source].add(edge.target);
+  //     
+  //     // Target node has upstream expanded (showing its source)
+  //     if (!newExpandedUpstream[edge.target]) {
+  //       newExpandedUpstream[edge.target] = new Set();
+  //     }
+  //     newExpandedUpstream[edge.target].add(edge.source);
+  //   });
+  //   
+  //   setExpandedUpstreamByNode(newExpandedUpstream);
+  //   setExpandedDownstreamByNode(newExpandedDownstream);
+  //   setShowAllChildren(false);
+  //   
+  //   // Create all nodes with correct expanded state
+  //   const allRfNodes = ALL_NODES.map(node => {
+  //     // Since all nodes are visible, set expanded flags based on tracking
+  //     const hasUpstream = (newExpandedUpstream[node.id]?.size || 0) > 0;
+  //     const hasDownstream = (newExpandedDownstream[node.id]?.size || 0) > 0;
+  //     
+  //     const rfNode = makeRfNode({ 
+  //       ...node, 
+  //       upstreamExpanded: hasUpstream,  // True if has upstream connections
+  //       downstreamExpanded: hasDownstream  // True if has downstream connections
+  //     });
+  //     rfNode.position = { x: 0, y: 0 }; // ELK will position them
+  //     return rfNode;
+  //   });
+  //   
+  //   // Create all edges
+  //   const allRfEdges = buildRfEdges(allNodeIds);
+  //   
+  //   // Set nodes and edges
+  //   setRfNodes(allRfNodes as any);
+  //   setRfEdges(allRfEdges as any);
+  //   
+  //   // Apply ELK layout to position all nodes properly
+  //   try {
+  //     const laidOutNodes = await elkLayout(allRfNodes as any, allRfEdges as any, 'RIGHT', false); // Use normal spacing, not expansion spacing
+  //     setRfNodes(laidOutNodes as any);
+  //     setTimeout(() => fitView({ padding: 0.1, includeHiddenNodes: false }), 150); // Fit all visible nodes with 10% padding
+  //   } catch (error) {
+  //     console.error('Failed to apply ELK layout:', error);
+  //     setTimeout(() => fitView({ padding: 0.1, includeHiddenNodes: false }), 100);
+  //   }
+  // }, [
+  //   setVisibleNodeIds,
+  //   setExpandedUpstreamByNode,
+  //   setExpandedDownstreamByNode,
+  //   setRfNodes,
+  //   setRfEdges,
+  //   buildRfEdges,
+  //   fitView,
+  // ]);
 
   const toggleAllChildren = useCallback(() => {
     const newShowAllChildren = !showAllChildren;
@@ -2208,7 +2208,7 @@ export function GraphView() {
       <div className={container.root}>
         <ReactFlowProvider>
           <GraphProvider>
-            <LineageCanvasInner rootNodeId={ROOT_NODE_ID} />
+            <LineageCanvasInner />
           </GraphProvider>
         </ReactFlowProvider>
       </div>
