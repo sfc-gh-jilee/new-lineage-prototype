@@ -512,8 +512,8 @@ function LineageCanvasInner() {
     parent: Node,
     count: number,
     dir: 'up' | 'down',
-    gapX = 480, // Increased by 200% from 360 to accommodate edge labels
-    gapY = 240, // Doubled from 120 to 240 for better spacing
+    gapX = 440, // Increased by 200% from 360 to accommodate edge labels
+    gapY = 200, // Doubled from 120 to 240 for better spacing
   ): XYPosition[] => {
     const startY = parent.position.y - ((count - 1) * gapY) / 2;
     const x = dir === 'down' ? parent.position.x + gapX : parent.position.x - gapX;
