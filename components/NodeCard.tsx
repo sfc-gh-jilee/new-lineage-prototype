@@ -34,6 +34,11 @@ export type NodeCardData = {
   onHoverChild?: (childName: string) => void; // Hover over column
   onUnhoverChild?: () => void; // Stop hovering over column
   onLayoutChange?: () => void; // Callback to trigger ReactFlow layout recalculation
+  onSelectNode?: () => void; // Select this node
+  // Group node specific
+  isGroupNode?: boolean;
+  groupedNodes?: any[];
+  onPromoteNode?: (nodeId: string) => void;
 };
 
 function PlusIcon() {
@@ -110,8 +115,7 @@ function TypeIcon({ type }: { type: ObjType }) {
     case 'MODEL':
       return (
         <svg {...iconProps} viewBox="0 0 16 16" fill="currentColor">
-          <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" fill="none"/>
-          <path d="M9 9h6v6H9z" stroke="currentColor" strokeWidth="2" fill="none"/>
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M8 1C9.38071 1 10.5 2.11929 10.5 3.5C10.5 3.87786 10.4128 4.23455 10.2627 4.55566L11.4434 5.73633C11.7646 5.58613 12.122 5.5 12.5 5.5C13.8807 5.5 15 6.61929 15 8C15 9.38071 13.8807 10.5 12.5 10.5C12.1218 10.5 11.7647 10.413 11.4434 10.2627L10.2627 11.4434C10.413 11.7647 10.5 12.1218 10.5 12.5C10.5 13.8807 9.38071 15 8 15C6.61929 15 5.5 13.8807 5.5 12.5C5.5 12.122 5.58613 11.7646 5.73633 11.4434L4.55566 10.2627C4.23455 10.4128 3.87786 10.5 3.5 10.5C2.11929 10.5 1 9.38071 1 8C1 6.61929 2.11929 5.5 3.5 5.5C3.87771 5.5 4.23464 5.58636 4.55566 5.73633L5.73633 4.55566C5.58636 4.23464 5.5 3.87771 5.5 3.5C5.5 2.11929 6.61929 1 8 1ZM8 11C7.17157 11 6.5 11.6716 6.5 12.5C6.5 13.3284 7.17157 14 8 14C8.82843 14 9.5 13.3284 9.5 12.5C9.5 11.6716 8.82843 11 8 11ZM9.6582 5.36523C9.21658 5.75812 8.63759 6 8 6C7.36215 6 6.78251 5.75841 6.34082 5.36523L5.36523 6.34082C5.75841 6.78251 6 7.36215 6 8C6 8.63759 5.75812 9.21658 5.36523 9.6582L6.34082 10.6338C6.78245 10.2409 7.36238 10 8 10C8.63735 10 9.21664 10.2412 9.6582 10.6338L10.6338 9.6582C10.2412 9.21664 10 8.63735 10 8C10 7.36238 10.2409 6.78245 10.6338 6.34082L9.6582 5.36523ZM3.5 6.5C2.67157 6.5 2 7.17157 2 8C2 8.82843 2.67157 9.5 3.5 9.5C4.32843 9.5 5 8.82843 5 8C5 7.17157 4.32843 6.5 3.5 6.5ZM12.5 6.5C11.6716 6.5 11 7.17157 11 8C11 8.82843 11.6716 9.5 12.5 9.5C13.3284 9.5 14 8.82843 14 8C14 7.17157 13.3284 6.5 12.5 6.5ZM8 2C7.17157 2 6.5 2.67157 6.5 3.5C6.5 4.32843 7.17157 5 8 5C8.82843 5 9.5 4.32843 9.5 3.5C9.5 2.67157 8.82843 2 8 2Z" fill="#5D6A85"/>
         </svg>
       );
     case 'EXTERNAL':
@@ -292,7 +296,7 @@ function DataQualityRating({ score }: { score: number }) {
       ref={containerRef}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      style={{ position: 'relative', cursor: 'help' }}
+      style={{ position: 'relative' }}
     >
       {Array.from({ length: 5 }, (_, i) => (
         <div
@@ -380,7 +384,7 @@ function CombinedErrorWarningIcon({ error, warning }: { error?: string | string[
       ref={containerRef}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      style={{ position: 'relative', cursor: 'help', display: 'inline-flex', alignItems: 'center', gap: 8 }}
+      style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 8 }}
     >
       {/* Error section */}
       {hasErrors && (
@@ -528,7 +532,7 @@ function ErrorWarningIcon({ type, message }: { type: 'error' | 'warning'; messag
         ref={containerRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        style={{ position: 'relative', cursor: 'help' }}
+        style={{ position: 'relative' }}
       >
         <svg {...iconProps} viewBox="0 0 16 16" fill="currentColor">
         <path d="M11.3535 5.35352L8.70703 8L11.3535 10.6465L10.6465 11.3535L8 8.70703L5.35352 11.3535L4.64648 10.6465L7.29297 8L4.64648 5.35352L5.35352 4.64648L8 7.29297L10.6465 4.64648L11.3535 5.35352Z" fill="#E32442"/>
@@ -582,7 +586,7 @@ function ErrorWarningIcon({ type, message }: { type: 'error' | 'warning'; messag
       ref={containerRef}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      style={{ position: 'relative', cursor: 'help' }}
+      style={{ position: 'relative' }}
     >
       <svg {...iconProps} viewBox="0 0 16 16" fill="currentColor">
       <path d="M8.00039 11.5003C8.41445 11.5005 8.75039 11.8362 8.75039 12.2503C8.75028 12.6643 8.41438 13.0001 8.00039 13.0003C7.58625 13.0003 7.2505 12.6644 7.25039 12.2503C7.25039 11.8361 7.58618 11.5003 8.00039 11.5003Z" fill="#F3BE0F"/>
@@ -630,7 +634,139 @@ function ErrorWarningIcon({ type, message }: { type: 'error' | 'warning'; messag
   );
 }
 
+// Mini Card with Tooltip
+function MiniCardWithTooltip({ node, onPromote }: { node: any; onPromote: () => void }) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [hoverTimeout, setHoverTimeout] = useState<number | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseEnter = () => {
+    const timeout = window.setTimeout(() => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setTooltipPosition({
+          x: rect.left + rect.width / 2,
+          y: rect.top - 10,
+        });
+      }
+      setShowTooltip(true);
+    }, 400); // Same delay as error/warning popovers
+    setHoverTimeout(timeout);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimeout) {
+      window.clearTimeout(hoverTimeout);
+      setHoverTimeout(null);
+    }
+    setShowTooltip(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeout) {
+        window.clearTimeout(hoverTimeout);
+      }
+    };
+  }, [hoverTimeout]);
+
+  return (
+    <>
+      <div
+        ref={containerRef}
+        onClick={onPromote}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        className="group-node-mini-card"
+      >
+        <TypeIcon type={node.objType} />
+      </div>
+
+      {showTooltip && createPortal(
+        <div
+          className="popover-base"
+          style={{
+            position: 'fixed',
+            left: `${tooltipPosition.x}px`,
+            top: `${tooltipPosition.y}px`,
+            transform: 'translate(-50%, -100%)',
+            marginTop: 0,
+            zIndex: 9999,
+            minWidth: '200px',
+            maxWidth: '300px',
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 8, color: '#1e252f' }}>
+            {node.label}
+          </div>
+          <div style={{ 
+            color: '#5d6a85',
+            wordBreak: 'break-all',
+          }}>
+            {node.id}
+          </div>
+          {/* <div style={{ 
+            fontSize: 11, 
+            color: '#8892a6',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            fontWeight: 500,
+          }}>
+            {node.objType}
+          </div> */}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+// Group Node Component - renders a grid of mini cards
+function GroupNodeCard({ data }: { data: NodeCardData }) {
+  const { groupedNodes = [], onPromoteNode, label } = data;
+  
+  return (
+    <div className="group-node-container" style={{ cursor: 'move' }}>
+      {/* Handles for connections */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        id={`${data.id}-main-in`}
+        className="group-node-handle"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id={`${data.id}-main-out`}
+        className="group-node-handle"
+      />
+      
+      {/* Header */}
+      <div className="group-node-header">
+        {label}
+      </div>
+      
+      {/* Grid of mini cards */}
+      <div className="group-node-grid">
+        {groupedNodes.map((node: any) => (
+          <MiniCardWithTooltip
+            key={node.id}
+            node={node}
+            onPromote={() => onPromoteNode?.(node.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function NodeCard({ data }: { data: NodeCardData }) {
+  // If this is a group node, render the group UI
+  if (data.isGroupNode && data.groupedNodes) {
+    return <GroupNodeCard data={data} />;
+  }
+
   const [childrenListHeight, setChildrenListHeight] = useState<number>(206); // Default height
   const [isAutoExpanded, setIsAutoExpanded] = useState<boolean>(false); // Track if auto-expanded
   const [isDragging, setIsDragging] = useState(false);
@@ -714,6 +850,12 @@ export function NodeCard({ data }: { data: NodeCardData }) {
   // Handle overflow menu clicks
   const handleUpstreamMenuClick = () => {
     console.log('🔵 Upstream menu button clicked', showUpstreamMenu);
+    
+    // Select this node when opening the menu
+    if (!showUpstreamMenu && data.onSelectNode) {
+      data.onSelectNode();
+    }
+    
     if (upstreamMenuButtonRef.current) {
       const rect = upstreamMenuButtonRef.current.getBoundingClientRect();
       console.log('🔵 Menu position:', rect);
@@ -728,6 +870,12 @@ export function NodeCard({ data }: { data: NodeCardData }) {
 
   const handleDownstreamMenuClick = () => {
     console.log('🔴 Downstream menu button clicked', showDownstreamMenu);
+    
+    // Select this node when opening the menu
+    if (!showDownstreamMenu && data.onSelectNode) {
+      data.onSelectNode();
+    }
+    
     if (downstreamMenuButtonRef.current) {
       const rect = downstreamMenuButtonRef.current.getBoundingClientRect();
       console.log('🔴 Menu position:', rect);

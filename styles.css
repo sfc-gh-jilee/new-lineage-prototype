@@ -36,6 +36,7 @@
   --radius-2xl: 12px;
   --radius-3xl: 16px;
   --text-sm: 12px;
+  --text-rg: 14px;
   --font-semibold: 600;
   --duration-fast: 150ms;
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
@@ -72,7 +73,7 @@
   box-shadow: var(--shadow);
   min-width: 160px;
   max-width: 240px;
-  font-size: var(--text-sm);
+  font-size: var(--text-rg);
   line-height: var(--leading-normal);
   pointer-events: none;
   z-index: var(--z-max);
@@ -92,7 +93,7 @@
 
 /* Overflow Menu */
 .overflow-menu {
-  padding: var(--space-1);
+  padding: var(--space-2) 0;
 }
 
 .overflow-menu-item {
@@ -101,24 +102,25 @@
   padding: var(--space-2) var(--space-3);
   cursor: pointer;
   border-radius: var(--radius-md);
-  font-size: var(--text-sm);
+  font-size: var(--text-rg);
   color: var(--text-primary);
   transition: background-color 0.15s ease;
   user-select: none;
 }
 
 .overflow-menu-item:hover {
-  background-color: var(--level2-background-color);
+  background-color: var(--background-hover);
 }
 
 .overflow-menu-item svg {
   flex-shrink: 0;
+  color: var(--text-secondary);
 }
 
 /* Interactive Element Utilities */
 .interactive-help {
   position: relative;
-  cursor: help;
+  /* cursor: help; */
 }
 
 .flex-center {
@@ -480,25 +482,14 @@ body {
 .node-card-view {
 } */
 
-.node-card-stage {
-  background-color: var(--yellow-50);
-  border-color: var(--yellow-300);
+/* .node-card-stage {
 }
 
 .node-card-dataset {
-  background-color: var(--blue-50);
-  border-color: var(--blue-300);
 }
 
 .node-card-model {
-  background-color: var(--red-50);
-  border-color: var(--red-300);
-}
-
-.node-card-default {
-  background-color: var(--gray-100);
-  border-color: var(--gray-300);
-}
+} */
 
 /* ReactFlow Handle Customization */
 .react-flow__handle {
@@ -1351,4 +1342,56 @@ hr {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Group Node Styles */
+.group-node-container {
+  min-width: 240px;
+  max-width: 360px;
+  border-radius: 8px;
+}
+
+.group-node-header {
+  position: absolute;
+  top: -24px;
+  left: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.group-node-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 12px;
+}
+
+.group-node-mini-card {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--level2-background-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-rg);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  color: #6b7280;
+}
+.group-node-mini-card svg {
+  margin-right: 0 !important;
+}
+
+.group-node-mini-card:hover {
+  border-color: var(--border-hover);
+}
+
+.group-node-handle {
+  width: 10px;
+  height: 10px;
+  background-color: #9ca3af;
+  border: 2px solid #ffffff;
 }

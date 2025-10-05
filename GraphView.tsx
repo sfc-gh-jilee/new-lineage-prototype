@@ -26,12 +26,14 @@ import { GraphProvider, useGraphVisibility } from './context/GraphContext';
 import { useExpand } from './hooks/useLineage';
 import { useHistory, type HistoryState } from './hooks/useHistory';
 import { elkLayout } from './lib/elkLayout';
-import { ALL_EDGES, NODE_BY_ID, ROOT_NODE_ID, COLUMN_LINEAGE, ALL_NODES } from './lib/mockData';
+import { ALL_EDGES, NODE_BY_ID, ROOT_NODE_ID, TEST_ROOT_NODE_ID, COLUMN_LINEAGE, ALL_NODES } from './lib/mockData';
 import type { LineageNode } from './lib/types';
 import { container } from './styles.stylex';
 
 type EdgeData = { relation?: string; isColumnEdge?: boolean; isSelected?: boolean };
-const nodeTypes = { lineage: NodeCard } as const;
+const nodeTypes = { 
+  lineage: NodeCard,
+} as const;
 const edgeTypes = customEdgeTypes;
 
 function makeRfNode(d: LineageNode & Partial<NodeCardData>): Node<NodeCardData> {
@@ -157,7 +159,7 @@ function findRelatedColumns(nodeId: string, columnName: string) {
   return relatedColumns;
 }
 
-function LineageCanvasInner() {
+function LineageCanvasInner({ rootNodeId = ROOT_NODE_ID }: { rootNodeId?: string }) {
   const {
     visibleNodeIds,
     setVisibleNodeIds,
@@ -512,7 +514,7 @@ function LineageCanvasInner() {
     count: number,
     dir: 'up' | 'down',
     gapX = 480, // Increased by 200% from 360 to accommodate edge labels
-    gapY = 360, // Increased by 200% from 160 for more vertical space
+    gapY = 240, // Doubled from 120 to 240 for better spacing
   ): XYPosition[] => {
     const startY = parent.position.y - ((count - 1) * gapY) / 2;
     const x = dir === 'down' ? parent.position.x + gapX : parent.position.x - gapX;
@@ -569,7 +571,7 @@ function LineageCanvasInner() {
 
   const buildRfEdges = useCallback((ids: Set<string>) => {
     const idSet = new Set(ids);
-    return ALL_EDGES.filter(({ source, target }) => idSet.has(source) && idSet.has(target)).map(
+    const edges = ALL_EDGES.filter(({ source, target }) => idSet.has(source) && idSet.has(target)).map(
       (e) =>
         ({
           id: e.id,
@@ -580,31 +582,48 @@ function LineageCanvasInner() {
           targetHandle: `${e.target}-main-in`,
           data: { relation: e.relation },
           animated: true,
-          style: { cursor: 'pointer' },
+          // style: { cursor: 'default' },
         }) as Edge<EdgeData>,
     );
+    
+    // Add edges for group nodes
+    // Group nodes have IDs like "nodeId-group-up" or "nodeId-group-down"
+    const groupNodes = Array.from(ids).filter(id => id.includes('-group-'));
+    groupNodes.forEach(groupId => {
+      const match = groupId.match(/^(.+)-group-(up|down)$/);
+      if (match) {
+        const [, parentId, direction] = match;
+        if (idSet.has(parentId)) {
+          // Create edge from parent to group
+          if (direction === 'down') {
+            edges.push({
+              id: `${parentId}->${groupId}`,
+              source: parentId,
+              target: groupId,
+              type: 'custom',
+              sourceHandle: `${parentId}-main-out`,
+              targetHandle: `${groupId}-main-in`,
+              data: { relation: 'GROUP' },
+              animated: true,
+            } as Edge<EdgeData>);
+          } else {
+            edges.push({
+              id: `${groupId}->${parentId}`,
+              source: groupId,
+              target: parentId,
+              type: 'custom',
+              sourceHandle: `${groupId}-main-out`,
+              targetHandle: `${parentId}-main-in`,
+              data: { relation: 'GROUP' },
+              animated: true,
+            } as Edge<EdgeData>);
+          }
+        }
+      }
+    });
+    
+    return edges;
   }, []);
-
-  const resetGraph = useCallback(() => {
-    setVisibleNodeIds(new Set([ROOT_NODE_ID]));
-    setExpandedUpstreamByNode({});
-    setExpandedDownstreamByNode({});
-    setShowAllChildren(false); // Reset show all children state
-    const root = NODE_BY_ID.get(ROOT_NODE_ID);
-    if (!root) return;
-    const rootNode = makeRfNode({ ...root, upstreamExpanded: false, downstreamExpanded: false });
-    rootNode.position = { x: 0, y: 0 };
-    setRfNodes([rootNode] as any);
-    setRfEdges([] as any);
-    setTimeout(() => fitView({ padding: 0.2 }), 0);
-  }, [
-    setVisibleNodeIds,
-    setExpandedUpstreamByNode,
-    setExpandedDownstreamByNode,
-    setRfNodes,
-    setRfEdges,
-    fitView,
-  ]);
 
   const tidyUpNodes = useCallback(async () => {
     // Get all currently visible nodes
@@ -723,11 +742,12 @@ function LineageCanvasInner() {
     }, 100);
   }, [showAllChildren, setRfNodes, getViewport, setViewport]);
 
-  useEffect(() => {
-    if (didInit.current) return;
-    didInit.current = true;
-    initializeAllNodes();
-  }, [initializeAllNodes]);
+  // Commented out - using resetGraph instead for custom initial state
+  // useEffect(() => {
+  //   if (didInit.current) return;
+  //   didInit.current = true;
+  //   initializeAllNodes();
+  // }, [initializeAllNodes]);
 
   const handleExpand = useCallback(
     (nodeId: string, dir: 'up' | 'down') => {
@@ -743,7 +763,15 @@ function LineageCanvasInner() {
         { nodeId, dir },
         {
           onSuccess: ({ ids }) => {
+            console.log('🔓 handleExpand onSuccess START', {
+              nodeId,
+              dir,
+              visibleNodeIds: Array.from(visibleNodeIds),
+              idsFound: ids.length
+            });
             const currentVisible = new Set(visibleNodeIds);
+            // Always ensure the parent node is in the visible set
+            currentVisible.add(nodeId);
             const toAdd = ids.filter((id) => !currentVisible.has(id));
             console.log('🔓 handleExpand onSuccess', nodeId, dir, 'found:', ids.length, 'toAdd:', toAdd.length);
             if (toAdd.length === 0) {
@@ -780,28 +808,195 @@ function LineageCanvasInner() {
               return;
             }
             console.log('✅ Adding nodes to visible:', toAdd);
-            const positions = placeNeighbors(parent, toAdd.length, dir);
-            const newNodes = toAdd.map((id, i) => {
-              const base = NODE_BY_ID.get(id)!;
-              const rf = makeRfNode({
-                ...base,
-                upstreamExpanded: false,
-                downstreamExpanded: false,
-              });
-              rf.position = positions[i];
-              return rf;
+            
+            // NEW LOGIC: If more than 10 nodes, show first 3 as normal nodes and rest in compact grid
+            const THRESHOLD = 10;
+            const SHOW_NORMAL = 3;
+            
+            console.log('🔍 Checking compact grid threshold:', { 
+              idsLength: ids.length,
+              toAddLength: toAdd.length, 
+              threshold: THRESHOLD,
+              willUseCompactGrid: ids.length > THRESHOLD 
             });
-            toAdd.forEach((id) => currentVisible.add(id));
+            
+            let newNodes: Node[] = [];
+            
+            // Use ids.length instead of toAdd.length to check total siblings
+            if (ids.length > THRESHOLD) {
+              console.log('🎨 Creating group node with many children!');
+              // Split into normal nodes and group node
+              const normalNodeIds = toAdd.slice(0, SHOW_NORMAL);
+              const groupedNodeIds = toAdd.slice(SHOW_NORMAL);
+              
+              // Create normal nodes
+              const positions = placeNeighbors(parent, SHOW_NORMAL + 1, dir); // +1 for group node
+              normalNodeIds.forEach((id, i) => {
+                const base = NODE_BY_ID.get(id)!;
+                const rf = makeRfNode({
+                  ...base,
+                  upstreamExpanded: false,
+                  downstreamExpanded: false,
+                });
+                rf.position = positions[i];
+                newNodes.push(rf);
+              });
+              
+              // Create group node as a special NodeCard
+              const groupNodeId = `${nodeId}-group-${dir}`;
+              const groupedNodes = groupedNodeIds.map(id => NODE_BY_ID.get(id)!);
+              console.log('📦 Group node details:', {
+                groupNodeId,
+                groupedNodeCount: groupedNodes.length,
+                normalNodeCount: normalNodeIds.length
+              });
+              
+              // Create a group node that looks like a NodeCard but contains mini cards
+              const groupNode: Node<NodeCardData> = {
+                id: groupNodeId,
+                type: 'lineage',
+                data: {
+                  id: groupNodeId,
+                  name: groupNodeId,
+                  label: `+${groupedNodeIds.length} more`,
+                  objType: 'DATASET',
+                  upstreamExpanded: false,
+                  downstreamExpanded: false,
+                  isGroupNode: true, // Special flag
+                  groupedNodes: groupedNodes, // Store the grouped nodes
+                  onPromoteNode: (promotedNodeId: string) => {
+                    console.log('🎯 Promoting node from group:', promotedNodeId);
+                    
+                    // Add to visible nodes first
+                    const updatedVisible = new Set(visibleNodeIds);
+                    updatedVisible.add(promotedNodeId);
+                    setVisibleNodeIds(updatedVisible);
+                    
+                    // Get all current sibling nodes (normal nodes + group node)
+                    const currentSiblings = nodesRef.current.filter((n) => {
+                      // Find nodes that are siblings (same level, connected to parent)
+                      if (n.id === nodeId) return false; // Skip parent
+                      if (n.id === groupNodeId) return true; // Include group node
+                      // Check if this node is a sibling (has edge from parent)
+                      return ALL_EDGES.some(e => 
+                        (dir === 'down' && e.source === nodeId && e.target === n.id) ||
+                        (dir === 'up' && e.target === nodeId && e.source === n.id)
+                      );
+                    });
+                    
+                    // Count how many nodes will be visible after promotion
+                    const normalSiblingsCount = currentSiblings.filter(n => !n.id.includes('-group-')).length;
+                    
+                    // Check if group will still exist after promotion
+                    const groupNode = currentSiblings.find(n => n.id === groupNodeId);
+                    const willGroupRemain = groupNode && (groupNode.data as any).groupedNodes?.length > 1;
+                    
+                    // Total nodes after promotion = normal siblings + promoted node + (group if it remains)
+                    const totalAfterPromotion = normalSiblingsCount + 1 + (willGroupRemain ? 1 : 0);
+                    
+                    // Recalculate positions for all siblings including group
+                    const newPositions = placeNeighbors(parent, totalAfterPromotion, dir);
+                    
+                    // Create the promoted node
+                    const promotedNode = NODE_BY_ID.get(promotedNodeId)!;
+                    const rf = makeRfNode({
+                      ...promotedNode,
+                      upstreamExpanded: false,
+                      downstreamExpanded: false,
+                    });
+                    
+                    // Update all nodes with new positions
+                    setRfNodes((curr) => {
+                      let positionIndex = 0;
+                      
+                      const updatedNodes = curr.map((n) => {
+                        // Update group node to remove the promoted node
+                        if (n.id === groupNodeId && (n.data as any).isGroupNode) {
+                          const nodeData = n.data as any;
+                          const remainingNodes = nodeData.groupedNodes.filter((gn: any) => gn.id !== promotedNodeId);
+                          
+                          // If group still has nodes, keep it with updated position at the end
+                          if (remainingNodes.length > 0) {
+                            return {
+                              ...n,
+                              position: newPositions[normalSiblingsCount + 1], // After all normal nodes + promoted node
+                              data: {
+                                ...nodeData,
+                                groupedNodes: remainingNodes,
+                                label: `+${remainingNodes.length} more`,
+                              },
+                            };
+                          }
+                          return null; // Mark for removal
+                        }
+                        
+                        // Reposition existing sibling nodes
+                        const isSibling = currentSiblings.some(s => s.id === n.id);
+                        if (isSibling && !n.id.includes('-group-')) {
+                          const newPos = newPositions[positionIndex++];
+                          return {
+                            ...n,
+                            position: newPos,
+                          };
+                        }
+                        
+                        return n;
+                      }).filter(n => n !== null); // Remove null entries (empty group)
+                      
+                      // Add the promoted node at its position (after existing normal siblings)
+                      rf.position = newPositions[positionIndex];
+                      
+                      return [...updatedNodes, rf] as any;
+                    });
+                    
+                    // Update edges - preserve existing edges and add new ones
+                    setRfEdges((currentEdges) => {
+                      const newEdges = buildRfEdges(updatedVisible);
+                      // Merge with existing edges, avoiding duplicates
+                      const edgeMap = new Map(currentEdges.map(e => [e.id, e]));
+                      newEdges.forEach(e => edgeMap.set(e.id, e));
+                      return Array.from(edgeMap.values()) as any;
+                    });
+                  },
+                } as any,
+                position: positions[SHOW_NORMAL],
+              };
+              newNodes.push(groupNode);
+              
+              // Add normal nodes to visible set
+              normalNodeIds.forEach((id) => currentVisible.add(id));
+              // Also add group node to visible set so edges can connect to it
+              currentVisible.add(groupNodeId);
+            } else {
+              // Original logic for <= 10 nodes
+              const positions = placeNeighbors(parent, toAdd.length, dir);
+              newNodes = toAdd.map((id, i) => {
+                const base = NODE_BY_ID.get(id)!;
+                const rf = makeRfNode({
+                  ...base,
+                  upstreamExpanded: false,
+                  downstreamExpanded: false,
+                });
+                rf.position = positions[i];
+                return rf;
+              });
+              toAdd.forEach((id) => currentVisible.add(id));
+            }
+            
             setVisibleNodeIds(currentVisible);
+            
+            // Track which nodes were actually added (visible nodes only, not grouped ones)
+            const nodesToTrack = Array.from(currentVisible).filter(id => id !== nodeId);
+            
             if (dir === 'up') {
               setExpandedUpstreamByNode((m) => ({
                 ...m,
-                [nodeId]: new Set([...(m[nodeId] || []), ...toAdd]),
+                [nodeId]: new Set([...(m[nodeId] || []), ...nodesToTrack]),
               }));
             } else {
               setExpandedDownstreamByNode((m) => ({
                 ...m,
-                [nodeId]: new Set([...(m[nodeId] || []), ...toAdd]),
+                [nodeId]: new Set([...(m[nodeId] || []), ...nodesToTrack]),
               }));
             }
             setRfNodes(
@@ -824,7 +1019,14 @@ function LineageCanvasInner() {
                   ...newNodes,
                 ] as any,
             );
-            setRfEdges(buildRfEdges(currentVisible) as any);
+            const edges = buildRfEdges(currentVisible);
+            console.log('🔗 Building edges:', {
+              visibleNodeCount: currentVisible.size,
+              visibleNodes: Array.from(currentVisible),
+              edgeCount: edges.length,
+              edges: edges.map(e => `${e.source} -> ${e.target}`)
+            });
+            setRfEdges(edges as any);
           },
         },
       );
@@ -880,6 +1082,14 @@ function LineageCanvasInner() {
       }
       const nextVisible = new Set(visibleNodeIds);
       for (const id of toRemove) nextVisible.delete(id);
+      
+      // Also remove group nodes associated with this collapse
+      const groupNodeId = `${nodeId}-group-${dir}`;
+      if (nextVisible.has(groupNodeId)) {
+        nextVisible.delete(groupNodeId);
+        console.log('🗑️ Removing group node:', groupNodeId);
+      }
+      
       console.log('✅ Removing from visible, new count:', nextVisible.size);
       setVisibleNodeIds(nextVisible);
       if (dir === 'up') {
@@ -909,10 +1119,10 @@ function LineageCanvasInner() {
                   }
                 : cn,
             )
-            .filter((cn) => !toRemove.has(cn.id)) as any,
+            .filter((cn) => !toRemove.has(cn.id) && cn.id !== groupNodeId) as any, // Also filter out group node
       );
       setRfEdges((curr) =>
-        curr.filter((e) => !toRemove.has(e.source as string) && !toRemove.has(e.target as string)),
+        curr.filter((e) => !toRemove.has(e.source as string) && !toRemove.has(e.target as string) && e.source !== groupNodeId && e.target !== groupNodeId),
       );
     },
     [
@@ -929,8 +1139,52 @@ function LineageCanvasInner() {
     ],
   );
 
+  const resetGraph = useCallback(() => {
+    console.log('🔄 resetGraph called');
+    
+    // Show only FCT_ORDERS and USER_BASE initially
+    const initialNodeIds = ['DW.PUBLIC.FCT_ORDERS', 'TEST.CORE.USER_BASE'];
+    setVisibleNodeIds(new Set(initialNodeIds));
+    setExpandedUpstreamByNode({});
+    setExpandedDownstreamByNode({});
+    setShowAllChildren(false);
+    
+    // Create both nodes
+    const nodes = initialNodeIds.map((id, index) => {
+      const node = NODE_BY_ID.get(id);
+      if (!node) return null;
+      const rfNode = makeRfNode({ ...node, upstreamExpanded: false, downstreamExpanded: false });
+      // Position them horizontally
+      rfNode.position = { x: index * 600, y: 0 };
+      return rfNode;
+    }).filter(Boolean);
+    
+    setRfNodes(nodes as any);
+    setRfEdges([] as any);
+    setTimeout(() => fitView({ padding: 0.2 }), 0);
+  }, [
+    setVisibleNodeIds,
+    setExpandedUpstreamByNode,
+    setExpandedDownstreamByNode,
+    setRfNodes,
+    setRfEdges,
+    fitView,
+  ]);
+
+  // Initialize on mount
+  useEffect(() => {
+    console.log('🎬 Component mounted, calling resetGraph');
+    resetGraph();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
+
   const rfNodesWithHandlers = useMemo(() => {
     return (rfNodes as Node<NodeCardData>[]).map((n) => {
+      // Skip processing for group nodes - they have their own handlers
+      if ((n.data as any).isGroupNode) {
+        return n;
+      }
+      
       // Use the expanded state already stored in node data (set by handleExpand/handleCollapse)
       // This is the source of truth for UI state
       const upstreamExpanded = (n.data as NodeCardData).upstreamExpanded || false;
@@ -1002,6 +1256,11 @@ function LineageCanvasInner() {
           onHoverChild: (childName: string) => {
             // Set hovered column lineage (but don't clear selected)
             setHoveredColumnLineage({ nodeId: n.id, columnName: childName });
+          },
+          onSelectNode: () => {
+            // Select this node (clear multi-selection and set as primary)
+            setSelectedNodeId(n.id);
+            setSelectedNodeIds(new Set());
           },
           onUnhoverChild: () => {
             // Clear hovered column lineage
@@ -1491,7 +1750,8 @@ function LineageCanvasInner() {
             nodeTypes={nodeTypes as any}
             edgeTypes={edgeTypes as any}
             proOptions={{ hideAttribution: true }}
-            defaultEdgeOptions={{ animated: true, style: { cursor: 'pointer' } }}
+            // defaultEdgeOptions={{ animated: true, style: { cursor: 'pointer' } }}
+            defaultEdgeOptions={{ animated: true }}
             defaultViewport={{ x: 0, y: 0, zoom: 1 }}
             panOnDrag={true}
             panOnScroll={false}
@@ -1945,36 +2205,10 @@ function LineageCanvasInner() {
 export function GraphView() {
   return (
     <div style={{ display: 'grid', gap: 8 }}>
-      {/* <div style={{ display: 'flex', gap: 8, position: 'absolute', zIndex: 999, top: '16px', left: '16px' }}>
-        <Button
-          onClick={() => setTab('lineage')}
-          variant={tab === 'lineage' ? 'primary' : 'secondary'}
-          size="md"
-          level="reactflow"
-        >
-          Lineage
-        </Button>
-        <Button
-          onClick={() => setTab('tree')}
-          variant={tab === 'tree' ? 'primary' : 'secondary'}
-          size="md"
-          level="reactflow"
-        >
-          Tree (200 nodes)
-        </Button>
-        <Button
-          onClick={() => setTab('schema')}
-          variant={tab === 'schema' ? 'primary' : 'secondary'}
-          size="md"
-          level="reactflow"
-        >
-          Schema Map
-        </Button>
-      </div> */}
       <div className={container.root}>
         <ReactFlowProvider>
           <GraphProvider>
-            <LineageCanvasInner />
+            <LineageCanvasInner rootNodeId={ROOT_NODE_ID} />
           </GraphProvider>
         </ReactFlowProvider>
       </div>

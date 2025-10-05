@@ -496,6 +496,46 @@ export const ALL_NODES: LineageNode[] = [
     { name: 'segmentation_data', type: 'JSON' },
     { name: 'behavior_patterns', type: 'JSON' }
   ], 'icons/looker-logo.png'),
+
+  // Test case: Node with many downstream connections (30 nodes)
+  n('TEST.CORE.USER_BASE', 'USER_BASE', 'TABLE', 5, '2024-01-20', undefined, undefined, [
+    { name: 'user_id', type: 'VARCHAR' },
+    { name: 'username', type: 'VARCHAR' },
+    { name: 'email', type: 'VARCHAR' },
+    { name: 'created_at', type: 'TIMESTAMP' }
+  ]),
+  
+  // 30 downstream nodes connected to USER_BASE
+  n('TEST.ANALYTICS.USER_PROFILE_1', 'User Profile 1', 'VIEW', 4, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.ANALYTICS.USER_PROFILE_2', 'User Profile 2', 'VIEW', 4, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.ANALYTICS.USER_PROFILE_3', 'User Profile 3', 'VIEW', 4, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.ANALYTICS.USER_PROFILE_4', 'User Profile 4', 'VIEW', 4, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.ANALYTICS.USER_PROFILE_5', 'User Profile 5', 'VIEW', 4, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.ANALYTICS.USER_PROFILE_6', 'User Profile 6', 'VIEW', 4, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.ANALYTICS.USER_PROFILE_7', 'User Profile 7', 'VIEW', 4, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.ANALYTICS.USER_PROFILE_8', 'User Profile 8', 'VIEW', 4, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.ANALYTICS.USER_PROFILE_9', 'User Profile 9', 'VIEW', 4, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.ANALYTICS.USER_PROFILE_10', 'User Profile 10', 'VIEW', 4, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.REPORTS.USER_ACTIVITY_1', 'User Activity 1', 'TABLE', 3, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.REPORTS.USER_ACTIVITY_2', 'User Activity 2', 'TABLE', 3, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.REPORTS.USER_ACTIVITY_3', 'User Activity 3', 'TABLE', 3, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.REPORTS.USER_ACTIVITY_4', 'User Activity 4', 'TABLE', 3, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.REPORTS.USER_ACTIVITY_5', 'User Activity 5', 'TABLE', 3, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.DASHBOARDS.USER_METRICS_1', 'User Metrics 1', 'VIEW', 5, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.DASHBOARDS.USER_METRICS_2', 'User Metrics 2', 'VIEW', 5, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.DASHBOARDS.USER_METRICS_3', 'User Metrics 3', 'VIEW', 5, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.DASHBOARDS.USER_METRICS_4', 'User Metrics 4', 'VIEW', 5, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.DASHBOARDS.USER_METRICS_5', 'User Metrics 5', 'VIEW', 5, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.ML.USER_PREDICTIONS_1', 'User Predictions 1', 'MODEL', 4, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.ML.USER_PREDICTIONS_2', 'User Predictions 2', 'MODEL', 4, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.ML.USER_PREDICTIONS_3', 'User Predictions 3', 'MODEL', 4, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.ML.USER_PREDICTIONS_4', 'User Predictions 4', 'MODEL', 4, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.ML.USER_PREDICTIONS_5', 'User Predictions 5', 'MODEL', 4, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.EXPORT.USER_SEGMENT_1', 'User Segment 1', 'EXTERNAL', 4, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.EXPORT.USER_SEGMENT_2', 'User Segment 2', 'EXTERNAL', 4, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.EXPORT.USER_SEGMENT_3', 'User Segment 3', 'EXTERNAL', 4, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.EXPORT.USER_SEGMENT_4', 'User Segment 4', 'EXTERNAL', 4, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
+  n('TEST.EXPORT.USER_SEGMENT_5', 'User Segment 5', 'EXTERNAL', 4, '2024-01-20', undefined, undefined, [{ name: 'user_id', type: 'VARCHAR' }]),
 ];
 
 export const ALL_EDGES: RelEdge[] = [
@@ -525,9 +565,42 @@ export const ALL_EDGES: RelEdge[] = [
   e('ANALYTICS.PUBLIC.LTV_VIEW', 'EXT.TABLEAU.EXECUTIVE_REPORTS', 'TABLEAU_EXPORT'),
   e('ANALYTICS.PUBLIC.MRR', 'EXT.TABLEAU.EXECUTIVE_REPORTS', 'TABLEAU_EXPORT'),
   e('DW.PUBLIC.DIM_CUSTOMER', 'EXT.LOOKER.CUSTOMER_INSIGHTS', 'LOOKER_EXPORT'),
+
+  // Test case: 30 edges from USER_BASE to downstream nodes
+  e('TEST.CORE.USER_BASE', 'TEST.ANALYTICS.USER_PROFILE_1', 'DBT_MODEL'),
+  e('TEST.CORE.USER_BASE', 'TEST.ANALYTICS.USER_PROFILE_2', 'DBT_MODEL'),
+  e('TEST.CORE.USER_BASE', 'TEST.ANALYTICS.USER_PROFILE_3', 'DBT_MODEL'),
+  e('TEST.CORE.USER_BASE', 'TEST.ANALYTICS.USER_PROFILE_4', 'DBT_MODEL'),
+  e('TEST.CORE.USER_BASE', 'TEST.ANALYTICS.USER_PROFILE_5', 'DBT_MODEL'),
+  e('TEST.CORE.USER_BASE', 'TEST.ANALYTICS.USER_PROFILE_6', 'DBT_MODEL'),
+  e('TEST.CORE.USER_BASE', 'TEST.ANALYTICS.USER_PROFILE_7', 'DBT_MODEL'),
+  e('TEST.CORE.USER_BASE', 'TEST.ANALYTICS.USER_PROFILE_8', 'DBT_MODEL'),
+  e('TEST.CORE.USER_BASE', 'TEST.ANALYTICS.USER_PROFILE_9', 'DBT_MODEL'),
+  e('TEST.CORE.USER_BASE', 'TEST.ANALYTICS.USER_PROFILE_10', 'DBT_MODEL'),
+  e('TEST.CORE.USER_BASE', 'TEST.REPORTS.USER_ACTIVITY_1', 'VIEW DEP'),
+  e('TEST.CORE.USER_BASE', 'TEST.REPORTS.USER_ACTIVITY_2', 'VIEW DEP'),
+  e('TEST.CORE.USER_BASE', 'TEST.REPORTS.USER_ACTIVITY_3', 'VIEW DEP'),
+  e('TEST.CORE.USER_BASE', 'TEST.REPORTS.USER_ACTIVITY_4', 'VIEW DEP'),
+  e('TEST.CORE.USER_BASE', 'TEST.REPORTS.USER_ACTIVITY_5', 'VIEW DEP'),
+  e('TEST.CORE.USER_BASE', 'TEST.DASHBOARDS.USER_METRICS_1', 'VIEW DEP'),
+  e('TEST.CORE.USER_BASE', 'TEST.DASHBOARDS.USER_METRICS_2', 'VIEW DEP'),
+  e('TEST.CORE.USER_BASE', 'TEST.DASHBOARDS.USER_METRICS_3', 'VIEW DEP'),
+  e('TEST.CORE.USER_BASE', 'TEST.DASHBOARDS.USER_METRICS_4', 'VIEW DEP'),
+  e('TEST.CORE.USER_BASE', 'TEST.DASHBOARDS.USER_METRICS_5', 'VIEW DEP'),
+  e('TEST.CORE.USER_BASE', 'TEST.ML.USER_PREDICTIONS_1', 'ML_PIPELINE'),
+  e('TEST.CORE.USER_BASE', 'TEST.ML.USER_PREDICTIONS_2', 'ML_PIPELINE'),
+  e('TEST.CORE.USER_BASE', 'TEST.ML.USER_PREDICTIONS_3', 'ML_PIPELINE'),
+  e('TEST.CORE.USER_BASE', 'TEST.ML.USER_PREDICTIONS_4', 'ML_PIPELINE'),
+  e('TEST.CORE.USER_BASE', 'TEST.ML.USER_PREDICTIONS_5', 'ML_PIPELINE'),
+  e('TEST.CORE.USER_BASE', 'TEST.EXPORT.USER_SEGMENT_1', 'API_EXPORT'),
+  e('TEST.CORE.USER_BASE', 'TEST.EXPORT.USER_SEGMENT_2', 'API_EXPORT'),
+  e('TEST.CORE.USER_BASE', 'TEST.EXPORT.USER_SEGMENT_3', 'API_EXPORT'),
+  e('TEST.CORE.USER_BASE', 'TEST.EXPORT.USER_SEGMENT_4', 'API_EXPORT'),
+  e('TEST.CORE.USER_BASE', 'TEST.EXPORT.USER_SEGMENT_5', 'API_EXPORT'),
 ];
 
 export const ROOT_NODE_ID = 'DW.PUBLIC.FCT_ORDERS';
+export const TEST_ROOT_NODE_ID = 'TEST.CORE.USER_BASE';
 
 // Column lineage relationships
 export const COLUMN_LINEAGE: ColumnLineageEdge[] = [
