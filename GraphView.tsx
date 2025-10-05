@@ -1122,6 +1122,7 @@ function LineageCanvasInner() {
       }
       
       console.log('✅ Removing from visible, new count:', nextVisible.size);
+      console.log('✅ Nodes that will remain visible:', Array.from(nextVisible));
       setVisibleNodeIds(nextVisible);
       if (dir === 'up') {
         const copy = { ...expandedUpstreamByNode };
@@ -1154,21 +1155,16 @@ function LineageCanvasInner() {
       );
       setRfEdges((curr) =>
         curr.filter((e) => {
-          const sourceRemoved = toRemove.has(e.source as string) || e.source === groupNodeId;
-          const targetRemoved = toRemove.has(e.target as string) || e.target === groupNodeId;
-          const sourceIsCollapsedNode = e.source === nodeId;
-          const targetIsCollapsedNode = e.target === nodeId;
+          // Keep edge only if BOTH source and target are still in nextVisible
+          const sourceStillVisible = nextVisible.has(e.source as string);
+          const targetStillVisible = nextVisible.has(e.target as string);
+          const keep = sourceStillVisible && targetStillVisible;
           
-          // Remove edge if:
-          // 1. It connects to/from the collapsed node AND the other end is being removed
-          // 2. Both ends are being removed
-          // Keep edge if:
-          // - Only one end is being removed but the other end is still visible (not the collapsed node)
-          if (sourceIsCollapsedNode && targetRemoved) return false; // collapsed -> removed
-          if (targetIsCollapsedNode && sourceRemoved) return false; // removed -> collapsed
-          if (sourceRemoved && targetRemoved) return false; // both removed
+          if (!keep) {
+            console.log(`🗑️ Removing edge: ${e.source} -> ${e.target} (source visible: ${sourceStillVisible}, target visible: ${targetStillVisible})`);
+          }
           
-          return true; // Keep all other edges
+          return keep;
         }),
       );
     },
