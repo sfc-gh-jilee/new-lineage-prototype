@@ -862,10 +862,10 @@ export function NodeCard({ data }: { data: NodeCardData }) {
             variant="icon"
             level="nodecard"
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <circle cx="8" cy="3" r="1.5" />
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+              <circle cx="3" cy="8" r="1.5" />
               <circle cx="8" cy="8" r="1.5" />
-              <circle cx="8" cy="13" r="1.5" />
+              <circle cx="13" cy="8" r="1.5" />
             </svg>
           </IconButton>
         </div>
@@ -906,10 +906,10 @@ export function NodeCard({ data }: { data: NodeCardData }) {
             variant="icon"
             level="nodecard"
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <circle cx="8" cy="3" r="1.5" />
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+              <circle cx="3" cy="8" r="1.5" />
               <circle cx="8" cy="8" r="1.5" />
-              <circle cx="8" cy="13" r="1.5" />
+              <circle cx="13" cy="8" r="1.5" />
             </svg>
           </IconButton>
         </div>
