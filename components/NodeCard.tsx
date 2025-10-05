@@ -663,6 +663,12 @@ function MiniCardWithTooltip({ node, onPromote }: { node: any; onPromote: () => 
     setShowTooltip(false);
   };
 
+  const handleClick = (e: React.MouseEvent) => {
+    // Stop propagation to prevent ReactFlow from selecting the group node
+    e.stopPropagation();
+    onPromote();
+  };
+
   useEffect(() => {
     return () => {
       if (hoverTimeout) {
@@ -675,7 +681,7 @@ function MiniCardWithTooltip({ node, onPromote }: { node: any; onPromote: () => 
     <>
       <div
         ref={containerRef}
-        onClick={onPromote}
+        onClick={handleClick}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         className="group-node-mini-card"
