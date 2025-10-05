@@ -712,10 +712,11 @@ export function NodeCard({ data }: { data: NodeCardData }) {
   const showToolbars = isHovered || isToolbarHovered || data.selected;
 
   // Handle overflow menu clicks
-  const handleUpstreamMenuClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleUpstreamMenuClick = () => {
+    console.log('🔵 Upstream menu button clicked', showUpstreamMenu);
     if (upstreamMenuButtonRef.current) {
       const rect = upstreamMenuButtonRef.current.getBoundingClientRect();
+      console.log('🔵 Menu position:', rect);
       setMenuPosition({
         top: rect.bottom + 4,
         left: rect.left,
@@ -725,10 +726,11 @@ export function NodeCard({ data }: { data: NodeCardData }) {
     setShowDownstreamMenu(false);
   };
 
-  const handleDownstreamMenuClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDownstreamMenuClick = () => {
+    console.log('🔴 Downstream menu button clicked', showDownstreamMenu);
     if (downstreamMenuButtonRef.current) {
       const rect = downstreamMenuButtonRef.current.getBoundingClientRect();
+      console.log('🔴 Menu position:', rect);
       setMenuPosition({
         top: rect.bottom + 4,
         left: rect.left,
@@ -740,7 +742,7 @@ export function NodeCard({ data }: { data: NodeCardData }) {
 
   // Close menus when clicking outside
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = () => {
       if (showUpstreamMenu || showDownstreamMenu) {
         setShowUpstreamMenu(false);
         setShowDownstreamMenu(false);
@@ -887,21 +889,21 @@ export function NodeCard({ data }: { data: NodeCardData }) {
           onMouseEnter={handleToolbarMouseEnter}
           onMouseLeave={handleToolbarMouseLeave}
         >
-            <div ref={upstreamMenuButtonRef as any}>
-              <IconButton
-                aria-label="Upstream actions"
-                onClick={handleUpstreamMenuClick}
-                size="sm"
-                variant="icon"
-                level="nodecard"
-              >
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-                  <circle cx="3" cy="8" r="1.5" />
-                  <circle cx="8" cy="8" r="1.5" />
-                  <circle cx="13" cy="8" r="1.5" />
-                </svg>
-              </IconButton>
-            </div>
+          <div ref={upstreamMenuButtonRef as any}>
+            <IconButton
+              aria-label="Upstream actions"
+              onClick={handleUpstreamMenuClick}
+              size="sm"
+              variant="icon"
+              level="nodecard"
+            >
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                <circle cx="3" cy="8" r="1.5" />
+                <circle cx="8" cy="8" r="1.5" />
+                <circle cx="13" cy="8" r="1.5" />
+              </svg>
+            </IconButton>
+          </div>
           <IconButton
             aria-label="Toggle upstream"
             onClick={() => {
