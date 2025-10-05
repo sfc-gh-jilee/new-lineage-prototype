@@ -83,7 +83,7 @@ function TableNode({ data }: NodeProps<TableNodeData>) {
               ...sx.row,
               ...(data.selectedKey === c.name ? sx.rowSelected : {}),
               fontWeight: data.selectedKey === c.name ? 700 : 400,
-              cursor: 'pointer'
+              // cursor: 'pointer'
             }}
             onClick={(e) => {
               e.stopPropagation();

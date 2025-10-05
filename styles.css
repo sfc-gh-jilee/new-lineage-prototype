@@ -355,10 +355,8 @@ body {
 }
 
 .node-card-base.focused {
-  border-color: var(--primary-color);
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
   position: relative;
-  z-index: 1600; /* Higher than hover state */
 }
 
 /* Column selected nodes - bring to top */
