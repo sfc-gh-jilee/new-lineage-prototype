@@ -872,6 +872,19 @@ function LineageCanvasInner() {
                     updatedVisible.add(promotedNodeId);
                     setVisibleNodeIds(updatedVisible);
                     
+                    // Update tracking to include the promoted node
+                    if (dir === 'up') {
+                      setExpandedUpstreamByNode((m) => ({
+                        ...m,
+                        [nodeId]: new Set([...(m[nodeId] || []), promotedNodeId]),
+                      }));
+                    } else {
+                      setExpandedDownstreamByNode((m) => ({
+                        ...m,
+                        [nodeId]: new Set([...(m[nodeId] || []), promotedNodeId]),
+                      }));
+                    }
+                    
                     // Get all current sibling nodes (normal nodes + group node)
                     const currentSiblings = nodesRef.current.filter((n) => {
                       // Find nodes that are siblings (same level, connected to parent)
