@@ -923,6 +923,15 @@ function LineageCanvasInner() {
                       let positionIndex = 0;
                       
                       const updatedNodes = curr.map((n) => {
+                        // Clear focused state from all nodes
+                        const clearedFocus = {
+                          ...n,
+                          data: {
+                            ...n.data,
+                            focused: false,
+                          },
+                        };
+                        
                         // Update group node to remove the promoted node
                         if (n.id === groupNodeId && (n.data as any).isGroupNode) {
                           const nodeData = n.data as any;
@@ -931,10 +940,10 @@ function LineageCanvasInner() {
                           // If group still has nodes, keep it with updated position at the end
                           if (remainingNodes.length > 0) {
                             return {
-                              ...n,
+                              ...clearedFocus,
                               position: newPositions[normalSiblingsCount + 1], // After all normal nodes + promoted node
                               data: {
-                                ...nodeData,
+                                ...clearedFocus.data,
                                 groupedNodes: remainingNodes,
                                 label: `+${remainingNodes.length} more`,
                               },
@@ -948,16 +957,20 @@ function LineageCanvasInner() {
                         if (isSibling && !n.id.includes('-group-')) {
                           const newPos = newPositions[positionIndex++];
                           return {
-                            ...n,
+                            ...clearedFocus,
                             position: newPos,
                           };
                         }
                         
-                        return n;
+                        return clearedFocus;
                       }).filter(n => n !== null); // Remove null entries (empty group)
                       
-                      // Add the promoted node at its position (after existing normal siblings)
+                      // Add the promoted node at its position (after existing normal siblings) with focused state
                       rf.position = newPositions[positionIndex];
+                      rf.data = {
+                        ...rf.data,
+                        focused: true, // Set focused state on the promoted node
+                      };
                       
                       return [...updatedNodes, rf] as any;
                     });
@@ -1569,7 +1582,18 @@ function LineageCanvasInner() {
         }
       }))
     );
-  }, [setRfEdges]);
+    
+    // Clear focused state from all nodes
+    setRfNodes(nodes =>
+      nodes.map(n => ({
+        ...n,
+        data: {
+          ...n.data,
+          focused: false
+        }
+      }))
+    );
+  }, [setRfEdges, setRfNodes]);
   const closeDrawer = useCallback(() => {
     setDrawerNode(null);
     setDrawerEdge(null);
@@ -1743,6 +1767,55 @@ function LineageCanvasInner() {
   }, [selectedNodeIds, rfNodes, buildRfEdges, setVisibleNodeIds, setExpandedUpstreamByNode, setExpandedDownstreamByNode, setRfNodes, setRfEdges, selectedNodeId, setSelectedNodeId, closeDrawer, setSelectedNodeIds]);
 
   const filterButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Keyboard navigation: Tab to focus nodes, Enter to select
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        
+        // Get all visible nodes sorted by position (top-left to bottom-right)
+        const sortedNodes = [...rfNodes].sort((a, b) => {
+          // Sort by Y position first (top to bottom), then X position (left to right)
+          if (Math.abs(a.position.y - b.position.y) < 50) {
+            // If nodes are on roughly the same horizontal line, sort by X
+            return a.position.x - b.position.x;
+          }
+          return a.position.y - b.position.y;
+        });
+        
+        // Find currently focused node
+        const currentFocusedIndex = sortedNodes.findIndex(n => (n.data as NodeCardData).focused);
+        
+        // Calculate next index (wrap around)
+        const nextIndex = e.shiftKey
+          ? (currentFocusedIndex <= 0 ? sortedNodes.length - 1 : currentFocusedIndex - 1)
+          : (currentFocusedIndex < 0 || currentFocusedIndex >= sortedNodes.length - 1 ? 0 : currentFocusedIndex + 1);
+        
+        // Update nodes to set focused state
+        setRfNodes(nodes =>
+          nodes.map((n) => ({
+            ...n,
+            data: {
+              ...n.data,
+              focused: sortedNodes[nextIndex]?.id === n.id
+            }
+          }))
+        );
+      } else if (e.key === 'Enter') {
+        // Find focused node and select it
+        const focusedNode = rfNodes.find(n => (n.data as NodeCardData).focused);
+        if (focusedNode) {
+          setSelectedNodeId(focusedNode.id);
+          setDrawerNode(focusedNode as Node<NodeCardData>);
+          setSelectedNodeIds(new Set([focusedNode.id]));
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [rfNodes, setRfNodes, setSelectedNodeId, setDrawerNode, setSelectedNodeIds]);
 
   return (
     <>
