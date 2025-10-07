@@ -254,7 +254,7 @@ export class GraphStateManager {
       metadata: {
         isGroupNode: true,
         parentNodeId,
-        direction,
+        direction: direction === 'up' ? 'upstream' : 'downstream',
         groupedNodeIds,
         groupSize: groupedNodeIds.length
       },
@@ -397,7 +397,7 @@ export class GraphStateManager {
           }
           
           if (column.downstreamColumns) {
-            column.downstreamColumns.forEach(downstreamCol => {
+            column.downstreamColumns.forEach((downstreamCol: string) => {
               const downstreamNode = this.findNodeByColumnReference(downstreamCol);
               if (downstreamNode) {
                 downstream.add(downstreamNode.id);
@@ -439,7 +439,7 @@ export class GraphStateManager {
     }
     
     // Try to find by label match
-    for (const [id, node] of this.allNodes) {
+    for (const [, node] of this.allNodes) {
       if (node.label === reference) {
         return node;
       }
@@ -566,7 +566,7 @@ export class GraphStateManager {
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      relation: edge.relation,
+      relation: edge.relation || '',
       states: new Set(['in-graph', 'visible']),
       metadata: {}
     };
@@ -653,7 +653,7 @@ export class GraphStateManager {
       existingStates[stateId] = stateToSave;
       
       // Save back to localStorage
-      localStorage.setItem('lineage-saved-states', JSON.stringify(existingStates, (key, value) => {
+      localStorage.setItem('lineage-saved-states', JSON.stringify(existingStates, (_, value) => {
         // Convert Sets to Arrays for JSON serialization
         if (value instanceof Set) {
           return Array.from(value);
@@ -665,7 +665,7 @@ export class GraphStateManager {
       }));
       
       // Also save as current state
-      localStorage.setItem('lineage-current-state', JSON.stringify(stateToSave, (key, value) => {
+      localStorage.setItem('lineage-current-state', JSON.stringify(stateToSave, (_, value) => {
         if (value instanceof Set) {
           return Array.from(value);
         }
@@ -706,7 +706,7 @@ export class GraphStateManager {
         this.state = this.parseStateFromJSON(JSON.stringify(stateToLoad));
         
         // Update current state
-        localStorage.setItem('lineage-current-state', JSON.stringify(stateToLoad, (key, value) => {
+        localStorage.setItem('lineage-current-state', JSON.stringify(stateToLoad, (_, value) => {
           if (value instanceof Set) {
             return Array.from(value);
           }
@@ -751,7 +751,7 @@ export class GraphStateManager {
       const savedStates = this.getSavedStates();
       delete savedStates[stateId];
       
-      localStorage.setItem('lineage-saved-states', JSON.stringify(savedStates, (key, value) => {
+      localStorage.setItem('lineage-saved-states', JSON.stringify(savedStates, (_, value) => {
         if (value instanceof Set) {
           return Array.from(value);
         }
@@ -888,7 +888,7 @@ export class GraphStateManager {
   
   // State sharing capabilities
   exportStateAsJSON(): string {
-    return JSON.stringify(this.state, (key, value) => {
+    return JSON.stringify(this.state, (_, value) => {
       if (value instanceof Set) {
         return Array.from(value);
       }
