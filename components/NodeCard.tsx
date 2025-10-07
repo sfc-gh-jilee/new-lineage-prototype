@@ -5,6 +5,7 @@ import { Handle, Position, NodeToolbar } from 'reactflow';
 import type { ObjType, ColumnMetadata } from '../lib/types';
 import { colors, nodeCard } from '../styles';
 import { tokens } from '../lib/tokens';
+import { useDynamicExpansion } from '../hooks/useDynamicExpansion';
 
 export type NodeCardData = {
   id: string;
@@ -769,6 +770,16 @@ function GroupNodeCard({ data }: { data: NodeCardData }) {
 }
 
 export function NodeCard({ data }: { data: NodeCardData }) {
+  // Use dynamic expansion to get the current state
+  const dynamicExpansion = useDynamicExpansion();
+  const expansionState = dynamicExpansion.getExpansionState(data.id);
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('🔗 NodeCard expansion state for', data.id, ':', expansionState);
+    console.log('🔗 NodeCard debug info:', dynamicExpansion.getDebugInfo(data.id));
+  }, [data.id, expansionState, dynamicExpansion]);
+  
   // If this is a group node, render the group UI
   if (data.isGroupNode && data.groupedNodes) {
     return <GroupNodeCard data={data} />;
@@ -1062,14 +1073,15 @@ export function NodeCard({ data }: { data: NodeCardData }) {
           <IconButton
             aria-label="Toggle upstream"
             onClick={() => {
-              console.log('🔵 Upstream button clicked', data.id, data.upstreamExpanded);
+              console.log('🔵 Upstream button clicked', data.id, expansionState.upstreamExpanded);
               data.onToggleUpstream?.();
             }}
             size="sm"
             variant="icon"
             level="nodecard"
+            disabled={!expansionState.hasUpstream}
           >
-            {data.upstreamExpanded ? <MinusIcon /> : <PlusIcon />}
+            {expansionState.upstreamExpanded ? <MinusIcon /> : <PlusIcon />}
           </IconButton>
         </div>
       </NodeToolbar>
@@ -1090,14 +1102,15 @@ export function NodeCard({ data }: { data: NodeCardData }) {
           <IconButton
             aria-label="Toggle downstream"
             onClick={() => {
-              console.log('🔴 Downstream button clicked', data.id, data.downstreamExpanded);
+              console.log('🔴 Downstream button clicked', data.id, expansionState.downstreamExpanded);
               data.onToggleDownstream?.();
             }}
             size="sm"
             variant="icon"
             level="nodecard"
+            disabled={!expansionState.hasDownstream}
           >
-            {data.downstreamExpanded ? <MinusIcon /> : <PlusIcon />}
+            {expansionState.downstreamExpanded ? <MinusIcon /> : <PlusIcon />}
           </IconButton>
           <div ref={downstreamMenuButtonRef as any}>
             <IconButton

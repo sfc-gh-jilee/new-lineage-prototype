@@ -26,6 +26,7 @@ import { NodeCard, type NodeCardData } from './components/NodeCard';
 import { GraphProvider, useGraphVisibility } from './context/GraphContext';
 import { useExpand } from './hooks/useLineage';
 import { useHistory, type HistoryState } from './hooks/useHistory';
+import { useDynamicExpansion } from './hooks/useDynamicExpansion';
 import { elkLayout } from './lib/elkLayout';
 import { ALL_EDGES, NODE_BY_ID, COLUMN_LINEAGE, ALL_NODES } from './lib/mockData';
 import { ALL_CATALOG_NODES } from './lib/catalogData';
@@ -988,6 +989,19 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
   }, [setViewport]);
 
   const expandMutation = useExpand();
+  const dynamicExpansion = useDynamicExpansion();
+
+  // Initialize dynamic expansion with all available nodes and edges
+  useEffect(() => {
+    const allNodes = [...ALL_NODES, ...ALL_CATALOG_NODES];
+    const allEdges = [...ALL_EDGES, ...ALL_CATALOG_EDGES];
+    dynamicExpansion.initializeRelationships(allNodes, allEdges);
+  }, [dynamicExpansion]);
+
+  // Update visible nodes in dynamic expansion when visible nodes change
+  useEffect(() => {
+    dynamicExpansion.updateVisibleNodes(visibleNodeIds);
+  }, [visibleNodeIds, dynamicExpansion]);
 
   const placeNeighbors = (
     parent: Node,
@@ -1242,6 +1256,17 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
       console.log('🔓 handleExpand called', nodeId, dir);
       const parent = nodesRef.current.find((n) => n.id === nodeId);
       if (!parent) return;
+
+      // Update dynamic expansion state
+      try {
+        const expansionResult = dir === 'up' 
+          ? dynamicExpansion.expandUpstream(nodeId)
+          : dynamicExpansion.expandDownstream(nodeId);
+        
+        console.log('🔗 Dynamic expansion result:', expansionResult);
+      } catch (error) {
+        console.error('🔗 Dynamic expansion error:', error);
+      }
       expandMutation.mutate(
         { nodeId, dir },
         {
@@ -1577,6 +1602,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
       buildRfEdges,
       pushState,
       captureState,
+      dynamicExpansion,
     ],
   );
 
@@ -1588,6 +1614,17 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
       }
       
       console.log('🔒 handleCollapse called', nodeId, dir);
+
+      // Update dynamic expansion state
+      try {
+        const collapseResult = dir === 'up' 
+          ? dynamicExpansion.collapseUpstream(nodeId)
+          : dynamicExpansion.collapseDownstream(nodeId);
+        
+        console.log('🔗 Dynamic collapse result:', collapseResult);
+      } catch (error) {
+        console.error('🔗 Dynamic collapse error:', error);
+      }
       const record =
         dir === 'up'
           ? expandedUpstreamByNode[nodeId] || new Set<string>()
@@ -1683,6 +1720,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
       setRfEdges,
       pushState,
       captureState,
+      dynamicExpansion,
     ],
   );
 
@@ -1783,13 +1821,17 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
           selectedChildren,
           focusedChild,
           onToggleUpstream: () => {
-            // Use the node data as the source of truth for current state
-            const isCurrentlyExpanded = upstreamExpanded;
+            // Use the dynamic expansion state as the source of truth
+            const expansionState = dynamicExpansion.getExpansionState(n.id);
+            const isCurrentlyExpanded = expansionState.upstreamExpanded;
+            console.log('🔗 onToggleUpstream: Current state for', n.id, ':', expansionState);
             isCurrentlyExpanded ? handleCollapse(n.id, 'up') : handleExpand(n.id, 'up');
           },
           onToggleDownstream: () => {
-            // Use the node data as the source of truth for current state
-            const isCurrentlyExpanded = downstreamExpanded;
+            // Use the dynamic expansion state as the source of truth
+            const expansionState = dynamicExpansion.getExpansionState(n.id);
+            const isCurrentlyExpanded = expansionState.downstreamExpanded;
+            console.log('🔗 onToggleDownstream: Current state for', n.id, ':', expansionState);
             isCurrentlyExpanded ? handleCollapse(n.id, 'down') : handleExpand(n.id, 'down');
           },
           onToggleChildren: () => {
@@ -2421,21 +2463,31 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
       // Add to visible nodes
       setVisibleNodeIds(prev => new Set([...prev, node.id]));
 
+      // Update dynamic expansion system with new visible nodes
+      const newVisibleIds = new Set([...visibleNodeIds, node.id]);
+      dynamicExpansion.updateVisibleNodes(newVisibleIds);
+
       // Add to ReactFlow
       setRfNodes(prev => [...prev, newRfNode as any]);
 
       // Update expansion tracking state if needed
       if (upstreamVisible) {
+        const upstreamNodeIds = new Set(upstreamNodes.filter(id => visibleNodeIds.has(id)));
         setExpandedUpstreamByNode(prev => ({
           ...prev,
-          [node.id]: new Set(upstreamNodes.filter(id => visibleNodeIds.has(id)))
+          [node.id]: upstreamNodeIds
         }));
+        // Also update dynamic expansion system
+        dynamicExpansion.markUpstreamExpanded(node.id, upstreamNodeIds);
       }
       if (downstreamVisible) {
+        const downstreamNodeIds = new Set(downstreamNodes.filter(id => visibleNodeIds.has(id)));
         setExpandedDownstreamByNode(prev => ({
           ...prev,
-          [node.id]: new Set(downstreamNodes.filter(id => visibleNodeIds.has(id)))
+          [node.id]: downstreamNodeIds
         }));
+        // Also update dynamic expansion system
+        dynamicExpansion.markDownstreamExpanded(node.id, downstreamNodeIds);
       }
 
       // Build edges for this new node
@@ -2461,7 +2513,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
 
       console.log('Added node from catalog:', node.id, 'at position', nodePosition);
     },
-    [visibleNodeIds, setVisibleNodeIds, setRfNodes, setRfEdges, getViewport, makeRfNode]
+    [visibleNodeIds, setVisibleNodeIds, setRfNodes, setRfEdges, getViewport, makeRfNode, dynamicExpansion]
   );
 
   // Handle add multiple nodes from schema
@@ -2519,6 +2571,9 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
       const newVisibleNodeIds = new Set([...visibleNodeIds, ...newNodes.map(n => n.id)]);
       setVisibleNodeIds(newVisibleNodeIds);
 
+      // Update dynamic expansion system with new visible nodes
+      dynamicExpansion.updateVisibleNodes(newVisibleNodeIds);
+
       // Add new nodes to ReactFlow
       setRfNodes(prev => [...prev, ...newRfNodes as any]);
 
@@ -2532,16 +2587,22 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
         const downstreamVisible = downstreamNodes.some(id => newVisibleNodeIds.has(id));
 
         if (upstreamVisible) {
+          const upstreamNodeIds = new Set(upstreamNodes.filter(id => newVisibleNodeIds.has(id)));
           setExpandedUpstreamByNode(prev => ({
             ...prev,
-            [nodeId]: new Set(upstreamNodes.filter(id => newVisibleNodeIds.has(id)))
+            [nodeId]: upstreamNodeIds
           }));
+          // Also update dynamic expansion system
+          dynamicExpansion.markUpstreamExpanded(nodeId, upstreamNodeIds);
         }
         if (downstreamVisible) {
+          const downstreamNodeIds = new Set(downstreamNodes.filter(id => newVisibleNodeIds.has(id)));
           setExpandedDownstreamByNode(prev => ({
             ...prev,
-            [nodeId]: new Set(downstreamNodes.filter(id => newVisibleNodeIds.has(id)))
+            [nodeId]: downstreamNodeIds
           }));
+          // Also update dynamic expansion system
+          dynamicExpansion.markDownstreamExpanded(nodeId, downstreamNodeIds);
         }
       });
 
@@ -2564,7 +2625,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
 
       console.log(`Added ${newNodes.length} nodes and ${newEdges.length} edges from schema`);
     },
-    [visibleNodeIds, setVisibleNodeIds, setRfNodes, setRfEdges, rfNodes, rfEdges, makeRfNode]
+    [visibleNodeIds, setVisibleNodeIds, setRfNodes, setRfEdges, rfNodes, rfEdges, makeRfNode, dynamicExpansion]
   );
 
   // Handle drag over from catalog
