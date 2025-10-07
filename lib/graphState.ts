@@ -52,6 +52,13 @@ export interface GraphNode {
         dataQuality?: number; // 0-100
       };
     };
+    
+    // Group node metadata
+    isGroupNode?: boolean;
+    parentNodeId?: string;
+    direction?: 'upstream' | 'downstream';
+    groupedNodeIds?: string[];
+    groupSize?: number;
   };
   
   // Column metadata
@@ -293,7 +300,7 @@ export class GraphStateManager {
       
       // Add the grouped nodes back to the graph if they're not already there
       const groupedNodeIds = groupNode.metadata.groupedNodeIds || [];
-      groupedNodeIds.forEach(nodeId => {
+      groupedNodeIds.forEach((nodeId: string) => {
         if (!this.state.nodes.has(nodeId)) {
           // Find the original node data and add it back
           const originalNode = this.allNodes.get(nodeId);
@@ -358,7 +365,7 @@ export class GraphStateManager {
       if (node.metadata?.columnLineage) {
         Object.values(node.metadata.columnLineage).forEach(columnLineage => {
           if (columnLineage.upstreamColumns) {
-            columnLineage.upstreamColumns.forEach(upstreamCol => {
+            columnLineage.upstreamColumns.forEach((upstreamCol: string) => {
               const upstreamNode = this.findNodeByColumnReference(upstreamCol);
               if (upstreamNode) {
                 upstream.add(upstreamNode.id);
@@ -381,7 +388,7 @@ export class GraphStateManager {
       if (node.columnsMetadata) {
         node.columnsMetadata.forEach(column => {
           if (column.upstreamColumns) {
-            column.upstreamColumns.forEach(upstreamCol => {
+            column.upstreamColumns.forEach((upstreamCol: string) => {
               const upstreamNode = this.findNodeByColumnReference(upstreamCol);
               if (upstreamNode) {
                 upstream.add(upstreamNode.id);
