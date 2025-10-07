@@ -354,7 +354,7 @@ export function AdvancedGraphStateDemo() {
                 padding: '10px', 
                 border: '1px solid #ddd', 
                 borderRadius: '4px',
-                backgroundColor: selectedNodes.some(n => n.id === node.id) ? '#e3f2fd' : 'white',
+                backgroundColor: selectedNodes.some(n => n && n.id === node.id) ? '#e3f2fd' : 'white',
                 cursor: 'pointer'
               }}
               onClick={() => selectNode(node.id)}

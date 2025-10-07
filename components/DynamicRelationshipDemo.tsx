@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useGraphState } from '../hooks/useGraphState';
 import { ALL_CATALOG_NODES } from '../lib/catalogData';
 
@@ -8,15 +8,12 @@ export function DynamicRelationshipDemo() {
     visibleNodes,
     addNode,
     removeNode,
-    selectNode,
-    clearSelection,
     expandUpstream,
     expandDownstream,
     getAvailableUpstreamNodes,
     getAvailableDownstreamNodes,
     refreshNodeRelationships,
-    updateNodeMetadata,
-    stateManager
+    updateNodeMetadata
   } = useGraphState();
 
   const [selectedNodeId, setSelectedNodeId] = useState<string>('');
@@ -25,11 +22,12 @@ export function DynamicRelationshipDemo() {
 
   // Get nodes with dynamic relationship metadata
   const nodesWithMetadata = useMemo(() => {
-    return ALL_CATALOG_NODES.filter(node => 
-      node.metadata?.upstreamReferences || 
-      node.metadata?.downstreamReferences || 
-      node.metadata?.columnLineage
-    );
+    return ALL_CATALOG_NODES.filter(node => {
+      const nodeWithMetadata = node as any;
+      return nodeWithMetadata.metadata?.upstreamReferences || 
+             nodeWithMetadata.metadata?.downstreamReferences || 
+             nodeWithMetadata.metadata?.columnLineage;
+    });
   }, []);
 
   const handleAddNodeWithMetadata = (node: any) => {
@@ -101,12 +99,11 @@ export function DynamicRelationshipDemo() {
               <div style={{ fontWeight: 'bold' }}>{node.label}</div>
               <div style={{ fontSize: '12px', color: '#666' }}>{node.name}</div>
               <div style={{ fontSize: '11px', color: '#888', marginTop: '5px' }}>
-                <div>Upstream: {node.metadata?.upstreamReferences?.length || 0}</div>
-                <div>Downstream: {node.metadata?.downstreamReferences?.length || 0}</div>
-                <div>Column Lineage: {node.metadata?.columnLineage ? Object.keys(node.metadata.columnLineage).length : 0}</div>
+                <div>Upstream: {(node as any).metadata?.upstreamReferences?.length || 0}</div>
+                <div>Downstream: {(node as any).metadata?.downstreamReferences?.length || 0}</div>
+                <div>Column Lineage: {(node as any).metadata?.columnLineage ? Object.keys((node as any).metadata.columnLineage).length : 0}</div>
               </div>
               <button 
-                size="small" 
                 onClick={() => handleAddNodeWithMetadata(node)}
                 style={{ marginTop: '8px', padding: '4px 8px' }}
               >
