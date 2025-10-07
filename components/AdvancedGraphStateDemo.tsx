@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useGraphState } from '../hooks/useGraphState';
 import { ALL_CATALOG_NODES } from '../lib/catalogData';
 import { ObjType } from '../lib/types';
@@ -21,17 +21,14 @@ export function AdvancedGraphStateDemo() {
     getAvailableUpstreamNodes,
     getAvailableDownstreamNodes,
     saveState,
-    loadState,
     loadStateById,
     getSavedStates,
     deleteSavedState,
     exportStateAsJSON,
     importStateFromJSON,
     generateShareableURL,
-    searchNodes,
     applyFilters,
-    getFilterOptions,
-    updateViewport
+    getFilterOptions
   } = useGraphState();
 
   // Local state for UI
@@ -149,7 +146,7 @@ export function AdvancedGraphStateDemo() {
         </button>
         
         <button 
-          onClick={() => selectedNodes.forEach(node => removeNode(node.id))}
+          onClick={() => selectedNodes.forEach(node => node && removeNode(node.id))}
           disabled={selectedNodes.length === 0}
         >
           Remove Selected ({selectedNodes.length})
@@ -218,10 +215,10 @@ export function AdvancedGraphStateDemo() {
                   {new Date(state.metadata.lastModified).toLocaleString()}
                 </div>
                 <div style={{ marginTop: '8px', display: 'flex', gap: '5px' }}>
-                  <button size="small" onClick={() => handleLoadState(stateId)}>
+                  <button onClick={() => handleLoadState(stateId)}>
                     Load
                   </button>
-                  <button size="small" onClick={() => handleDeleteState(stateId)}>
+                  <button onClick={() => handleDeleteState(stateId)}>
                     Delete
                   </button>
                 </div>
@@ -350,7 +347,7 @@ export function AdvancedGraphStateDemo() {
       <div style={{ marginBottom: '20px' }}>
         <h3>Filtered Nodes ({filteredNodes.length})</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '10px' }}>
-          {filteredNodes.map(node => (
+          {filteredNodes.map(node => node ? (
             <div 
               key={node.id}
               style={{ 
@@ -376,7 +373,6 @@ export function AdvancedGraphStateDemo() {
               {/* Node Actions */}
               <div style={{ marginTop: '8px', display: 'flex', gap: '5px' }}>
                 <button 
-                  size="small"
                   onClick={(e) => {
                     e.stopPropagation();
                     expandUpstream(node.id);
@@ -387,7 +383,6 @@ export function AdvancedGraphStateDemo() {
                 </button>
                 
                 <button 
-                  size="small"
                   onClick={(e) => {
                     e.stopPropagation();
                     expandDownstream(node.id);
@@ -398,7 +393,6 @@ export function AdvancedGraphStateDemo() {
                 </button>
                 
                 <button 
-                  size="small"
                   onClick={(e) => {
                     e.stopPropagation();
                     collapseUpstream(node.id);
@@ -409,7 +403,6 @@ export function AdvancedGraphStateDemo() {
                 </button>
                 
                 <button 
-                  size="small"
                   onClick={(e) => {
                     e.stopPropagation();
                     collapseDownstream(node.id);
@@ -420,7 +413,7 @@ export function AdvancedGraphStateDemo() {
                 </button>
               </div>
             </div>
-          ))}
+          ) : null)}
         </div>
       </div>
     </div>
