@@ -1,7 +1,7 @@
 import { LineageNode, LineageEdge, ObjType } from './types';
 
 // Node states in the graph
-export type NodeState = 'in-graph' | 'visible' | 'hidden' | 'selected' | 'focused' | 'expanded-upstream' | 'expanded-downstream';
+export type NodeState = 'in-graph' | 'visible' | 'hidden' | 'selected' | 'focused' | 'expanded-upstream' | 'expanded-downstream' | 'group-node';
 
 // Edge states in the graph  
 export type EdgeState = 'in-graph' | 'visible' | 'hidden' | 'selected' | 'focused';
