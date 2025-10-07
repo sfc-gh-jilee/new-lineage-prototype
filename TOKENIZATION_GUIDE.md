@@ -191,7 +191,7 @@ grep -r "#[0-9a-fA-F]\{3,6\}" components/
 grep -r "[0-9]\+px" components/
 
 # Find inline styles
-grep -r "style={{" components/
+grep -r "style=\{\{" components/
 ```
 
 ### **Audit Script:**
