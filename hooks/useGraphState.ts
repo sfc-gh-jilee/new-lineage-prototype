@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { GraphStateManager, GraphState, GraphNode, GraphEdge, NodeState, EdgeState } from '../lib/graphState';
+import { useState, useCallback, useEffect } from 'react';
+import { GraphStateManager, GraphState, NodeState, EdgeState } from '../lib/graphState';
 import { LineageNode, LineageEdge } from '../lib/types';
 import { ALL_CATALOG_NODES, ALL_CATALOG_EDGES } from '../lib/catalogData';
 import { NODE_BY_ID, ALL_EDGES } from '../lib/mockData';

@@ -952,7 +952,7 @@ export class GraphStateManager {
   }
   
   // Update last modified timestamp
-  private updateLastModified(): void {
+  public updateLastModified(): void {
     this.state.metadata.lastModified = Date.now();
   }
 }

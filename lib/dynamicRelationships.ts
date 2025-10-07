@@ -1,4 +1,4 @@
-import type { LineageNode, LineageEdge, ObjType } from './types';
+import type { LineageNode, LineageEdge } from './types';
 
 // Dynamic relationship manager for handling up/downstream expansion
 export class DynamicRelationshipManager {
@@ -117,9 +117,10 @@ export class DynamicRelationshipManager {
       console.log('🔗 findUpstream: Processing node', currentNodeId, currentNode.label);
 
       // Check metadata for upstream references
-      if (currentNode.metadata?.upstreamReferences) {
-        console.log('🔗 findUpstream: Found metadata upstream references', currentNode.metadata.upstreamReferences);
-        currentNode.metadata.upstreamReferences.forEach(ref => {
+      const nodeWithMetadata = currentNode as any;
+      if (nodeWithMetadata.metadata?.upstreamReferences) {
+        console.log('🔗 findUpstream: Found metadata upstream references', nodeWithMetadata.metadata.upstreamReferences);
+        nodeWithMetadata.metadata.upstreamReferences.forEach(ref => {
           const upstreamNode = this.findNodeByReference(ref);
           if (upstreamNode && !upstreamNodes.some(n => n.id === upstreamNode.id)) {
             console.log('🔗 findUpstream: Added upstream node from metadata', upstreamNode.id, upstreamNode.label);
@@ -130,9 +131,9 @@ export class DynamicRelationshipManager {
       }
 
       // Check column lineage for upstream references
-      if (currentNode.metadata?.columnLineage) {
+      if (nodeWithMetadata.metadata?.columnLineage) {
         console.log('🔗 findUpstream: Found column lineage metadata');
-        Object.values(currentNode.metadata.columnLineage).forEach(columnLineage => {
+        Object.values(nodeWithMetadata.metadata.columnLineage).forEach(columnLineage => {
           if (columnLineage.upstreamColumns) {
             columnLineage.upstreamColumns.forEach(upstreamCol => {
               const upstreamNode = this.findNodeByColumnReference(upstreamCol);
@@ -182,8 +183,9 @@ export class DynamicRelationshipManager {
       if (!currentNode) return;
 
       // Check metadata for downstream references
-      if (currentNode.metadata?.downstreamReferences) {
-        currentNode.metadata.downstreamReferences.forEach(ref => {
+      const nodeWithMetadata = currentNode as any;
+      if (nodeWithMetadata.metadata?.downstreamReferences) {
+        nodeWithMetadata.metadata.downstreamReferences.forEach(ref => {
           const downstreamNode = this.findNodeByReference(ref);
           if (downstreamNode && !downstreamNodes.some(n => n.id === downstreamNode.id)) {
             downstreamNodes.push(downstreamNode);
@@ -193,8 +195,8 @@ export class DynamicRelationshipManager {
       }
 
       // Check column lineage for downstream references
-      if (currentNode.metadata?.columnLineage) {
-        Object.values(currentNode.metadata.columnLineage).forEach(columnLineage => {
+      if (nodeWithMetadata.metadata?.columnLineage) {
+        Object.values(nodeWithMetadata.metadata.columnLineage).forEach(columnLineage => {
           if (columnLineage.downstreamColumns) {
             columnLineage.downstreamColumns.forEach(downstreamCol => {
               const downstreamNode = this.findNodeByColumnReference(downstreamCol);
