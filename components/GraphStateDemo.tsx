@@ -1,4 +1,3 @@
-import React from 'react';
 import { useGraphState } from '../hooks/useGraphState';
 import { ALL_CATALOG_NODES } from '../lib/catalogData';
 
@@ -20,8 +19,7 @@ export function GraphStateDemo() {
     getAvailableUpstreamNodes,
     getAvailableDownstreamNodes,
     saveState,
-    loadState,
-    updateViewport
+    loadState
   } = useGraphState();
 
   const handleAddRandomNode = () => {
@@ -35,7 +33,9 @@ export function GraphStateDemo() {
 
   const handleRemoveSelectedNodes = () => {
     selectedNodes.forEach(node => {
-      removeNode(node.id);
+      if (node) {
+        removeNode(node.id);
+      }
     });
     clearSelection();
   };
@@ -106,7 +106,7 @@ export function GraphStateDemo() {
                 padding: '10px', 
                 border: '1px solid #ddd', 
                 borderRadius: '4px',
-                backgroundColor: selectedNodes.some(n => n.id === node.id) ? '#e3f2fd' : 'white',
+                backgroundColor: selectedNodes.some(n => n && n.id === node.id) ? '#e3f2fd' : 'white',
                 cursor: 'pointer'
               }}
               onClick={() => selectNode(node.id)}
@@ -126,7 +126,6 @@ export function GraphStateDemo() {
               {/* Node Actions */}
               <div style={{ marginTop: '8px', display: 'flex', gap: '5px' }}>
                 <button 
-                  size="small"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleExpandUpstream(node.id);
@@ -137,7 +136,6 @@ export function GraphStateDemo() {
                 </button>
                 
                 <button 
-                  size="small"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleExpandDownstream(node.id);
@@ -148,7 +146,6 @@ export function GraphStateDemo() {
                 </button>
                 
                 <button 
-                  size="small"
                   onClick={(e) => {
                     e.stopPropagation();
                     collapseUpstream(node.id);
@@ -159,7 +156,6 @@ export function GraphStateDemo() {
                 </button>
                 
                 <button 
-                  size="small"
                   onClick={(e) => {
                     e.stopPropagation();
                     collapseDownstream(node.id);

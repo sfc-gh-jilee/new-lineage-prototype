@@ -209,7 +209,6 @@ export function DynamicRelationshipDemo() {
               {/* Node Actions */}
               <div style={{ marginTop: '8px', display: 'flex', gap: '5px' }}>
                 <button 
-                  size="small"
                   onClick={(e) => {
                     e.stopPropagation();
                     expandUpstream(node.id);
@@ -220,7 +219,6 @@ export function DynamicRelationshipDemo() {
                 </button>
                 
                 <button 
-                  size="small"
                   onClick={(e) => {
                     e.stopPropagation();
                     expandDownstream(node.id);
@@ -231,7 +229,6 @@ export function DynamicRelationshipDemo() {
                 </button>
                 
                 <button 
-                  size="small"
                   onClick={(e) => {
                     e.stopPropagation();
                     removeNode(node.id);
