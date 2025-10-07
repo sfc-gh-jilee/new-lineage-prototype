@@ -162,7 +162,7 @@ function findRelatedColumns(nodeId: string, columnName: string) {
   return relatedColumns;
 }
 
-function LineageCanvasInner() {
+function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'basic' | 'advanced' | 'dynamic') => void } = {}) {
   const {
     visibleNodeIds,
     setVisibleNodeIds,
@@ -197,6 +197,12 @@ function LineageCanvasInner() {
     direction: null,
   });
   const [showFilterPopover, setShowFilterPopover] = useState(false);
+  const [showDemoMenu, setShowDemoMenu] = useState(false);
+
+  // Debug demo menu state changes
+  useEffect(() => {
+    console.log('Demo menu state changed:', showDemoMenu);
+  }, [showDemoMenu]);
 
   const [selectedChildrenByNode, setSelectedChildrenByNode] = useState<Record<string, Set<string>>>({});
   const [focusedColumn, setFocusedColumn] = useState<{
@@ -212,11 +218,473 @@ function LineageCanvasInner() {
     columnName: string;
   } | null>(null);
   const [showAllChildren, setShowAllChildren] = useState<boolean>(false);
+
+  // Layout management state
+  const [savedLayout, setSavedLayout] = useState<Record<string, { x: number; y: number }> | null>(null);
+  const [defaultLayout, setDefaultLayout] = useState<Record<string, { x: number; y: number }> | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
 
   const { fitView, getViewport, setViewport, screenToFlowPosition } = useReactFlow();
   const nodesRef = useRef<Node<NodeCardData>[]>([]);
   const edgesRef = useRef<Edge<EdgeData>[]>([]);
+
+  // Comprehensive save/restore functions
+  const saveCurrentState = useCallback(() => {
+    const currentPositions: Record<string, { x: number; y: number }> = {};
+    rfNodes.forEach(node => {
+      currentPositions[node.id] = { x: node.position.x, y: node.position.y };
+    });
+
+    // Get current viewport state
+    const viewport = getViewport();
+    
+    console.log('💾 Saving state (v2):', {
+      visibleNodeIds: Array.from(visibleNodeIds),
+      groupNodes: rfNodes.filter(node => (node.data as any).isGroupNode).map(node => node.id),
+      allRfNodes: rfNodes.map(node => node.id),
+      groupNodesInVisible: Array.from(visibleNodeIds).filter(id => id.includes('-group-')),
+      totalVisibleNodes: visibleNodeIds.size,
+      totalRfNodes: rfNodes.length
+    });
+    
+    // Create comprehensive state object
+    const savedState = {
+      visibleNodeIds: Array.from(visibleNodeIds),
+      nodePositions: currentPositions,
+      expandedUpstream: Object.fromEntries(
+        Object.entries(expandedUpstreamByNode).map(([key, value]) => [key, Array.from(value)])
+      ),
+      expandedDownstream: Object.fromEntries(
+        Object.entries(expandedDownstreamByNode).map(([key, value]) => [key, Array.from(value)])
+      ),
+      groupNodes: rfNodes
+        .filter(node => (node.data as any).isGroupNode)
+        .map(node => ({
+          id: node.id,
+          position: node.position,
+          groupedNodes: (node.data as any).groupedNodes?.map((n: any) => n.id) || []
+        })),
+      viewport: {
+        x: viewport.x,
+        y: viewport.y,
+        zoom: viewport.zoom
+      },
+      timestamp: Date.now()
+    };
+
+    setSavedLayout(currentPositions);
+    
+    // Persist to localStorage
+    try {
+      localStorage.setItem('lineage-saved-state', JSON.stringify(savedState));
+      console.log('💾 Complete state saved to localStorage:', {
+        nodes: Object.keys(currentPositions).length,
+        visibleNodes: savedState.visibleNodeIds.length,
+        viewport: savedState.viewport
+      });
+    } catch (error) {
+      console.error('Failed to save state to localStorage:', error);
+    }
+  }, [rfNodes, visibleNodeIds, expandedUpstreamByNode, expandedDownstreamByNode, getViewport]);
+
+  const restoreSavedState = useCallback(() => {
+    try {
+      const savedStateData = localStorage.getItem('lineage-saved-state');
+      if (!savedStateData) {
+        console.log('⚠️ No saved state to restore');
+        return;
+      }
+
+      const savedState = JSON.parse(savedStateData);
+      console.log('📂 Restoring saved state:', {
+        visibleNodes: savedState.visibleNodeIds?.length || 0,
+        nodePositions: Object.keys(savedState.nodePositions || {}).length,
+        timestamp: new Date(savedState.timestamp).toLocaleString()
+      });
+
+      // Restore visible nodes
+      if (savedState.visibleNodeIds) {
+        setVisibleNodeIds(new Set(savedState.visibleNodeIds));
+      }
+
+      // Restore expansion states
+      if (savedState.expandedUpstream) {
+        const restoredUpstream: Record<string, Set<string>> = {};
+        Object.entries(savedState.expandedUpstream).forEach(([key, value]) => {
+          restoredUpstream[key] = new Set(value as string[]);
+        });
+        setExpandedUpstreamByNode(restoredUpstream);
+      }
+
+      if (savedState.expandedDownstream) {
+        const restoredDownstream: Record<string, Set<string>> = {};
+        Object.entries(savedState.expandedDownstream).forEach(([key, value]) => {
+          restoredDownstream[key] = new Set(value as string[]);
+        });
+        setExpandedDownstreamByNode(restoredDownstream);
+      }
+
+      // Create nodes for all visible nodes
+      const restoredNodes = savedState.visibleNodeIds.map((nodeId: string) => {
+        const baseNode = ALL_NODE_BY_ID.get(nodeId);
+        if (!baseNode) return null;
+
+        const rfNode = makeRfNode({
+          ...baseNode,
+          upstreamExpanded: savedState.expandedUpstream?.[nodeId]?.length > 0 || false,
+          downstreamExpanded: savedState.expandedDownstream?.[nodeId]?.length > 0 || false,
+        });
+
+        // Restore position if available
+        if (savedState.nodePositions?.[nodeId]) {
+          rfNode.position = savedState.nodePositions[nodeId];
+        }
+
+        return rfNode;
+      }).filter(Boolean);
+
+      setRfNodes(restoredNodes as any);
+
+      // Recreate group nodes if they exist in saved state
+      if (savedState.groupNodes && savedState.groupNodes.length > 0) {
+        console.log('🔄 Recreating group nodes:', savedState.groupNodes.length);
+        
+        const groupNodesToAdd: Node<NodeCardData>[] = [];
+        
+        savedState.groupNodes.forEach((groupNodeData: any) => {
+          const groupedNodes = groupNodeData.groupedNodes.map((id: string) => ALL_NODE_BY_ID.get(id)).filter(Boolean);
+          
+          if (groupedNodes.length > 0) {
+            const groupNode: Node<NodeCardData> = {
+              id: groupNodeData.id,
+              type: 'lineage',
+              data: {
+                id: groupNodeData.id,
+                name: groupNodeData.id,
+                label: `+${groupedNodes.length} more`,
+                objType: 'DATASET',
+                upstreamExpanded: false,
+                downstreamExpanded: false,
+                isGroupNode: true,
+                groupedNodes: groupedNodes,
+                onPromoteNode: (promotedNodeId: string) => {
+                  console.log('🚀 PROMOTION STARTED for:', promotedNodeId);
+                  console.log('🎯 Promoting node from group (restore):', promotedNodeId);
+                  
+                  // Add to visible nodes first
+                  const updatedVisible = new Set(visibleNodeIds);
+                  updatedVisible.add(promotedNodeId);
+                  setVisibleNodeIds(updatedVisible);
+                  
+                  // Create a new node for the promoted item
+                  const promotedNode = ALL_NODE_BY_ID.get(promotedNodeId);
+                  console.log('🔍 Promoted node found:', promotedNode);
+                  
+                  if (promotedNode) {
+                    // Find the parent node by looking at the original edge data
+                    // Look for edges where the promoted node is the target
+                    const allEdges = [...ALL_EDGES, ...ALL_CATALOG_EDGES];
+                    console.log('🔍 All edges count:', allEdges.length);
+                    
+                    const parentEdge = allEdges.find(edge => 
+                      edge.target === promotedNodeId
+                    );
+                    
+                    console.log('🔍 Parent edge found:', parentEdge);
+                    
+                    // Find the parent node in the current graph
+                    const parentNode = parentEdge ? rfNodes.find(node => node.id === parentEdge.source) : null;
+                    
+                    console.log('🔍 Parent node found:', parentNode?.id);
+                    
+                    // Special check for TEST.CORE.USER_BASE
+                    const userBaseNode = rfNodes.find(node => node.id === 'TEST.CORE.USER_BASE');
+                    console.log('🔍 TEST.CORE.USER_BASE found:', userBaseNode?.id);
+                    
+                    if (parentNode) {
+                      // Calculate position relative to parent
+                      const parentPos = parentNode.position;
+                      const offsetX = 200; // Distance from parent
+                      const offsetY = 100; // Vertical offset
+                      
+                      const newNode: Node<NodeCardData> = {
+                        id: promotedNodeId,
+                        type: 'lineage',
+                        data: {
+                          id: promotedNodeId,
+                          name: promotedNode.name,
+                          label: promotedNode.label,
+                          objType: promotedNode.objType,
+                          upstreamExpanded: false,
+                          downstreamExpanded: false,
+                          children: promotedNode.children, // Include the children data for columns/features
+                          columnsMetadata: promotedNode.columnsMetadata, // Include detailed column metadata
+                          dataQualityScore: promotedNode.dataQualityScore, // Include quality score
+                          onPromoteNode: (id: string) => {
+                            console.log('🎯 Promoting node from group:', id);
+                            // This will be handled by the existing promotion logic
+                          }
+                        },
+                        position: { 
+                          x: parentPos.x + offsetX, 
+                          y: parentPos.y + offsetY 
+                        }
+                      };
+                      
+                      // Create edge from parent to promoted node
+                      const newEdge: Edge = {
+                        id: `${parentNode.id}-${promotedNodeId}`,
+                        source: parentNode.id,
+                        target: promotedNodeId,
+                        type: 'custom',
+                        data: {
+                          sourceColumn: '',
+                          targetColumn: '',
+                          relationshipType: 'direct'
+                        }
+                      };
+                      
+                      setRfNodes(prev => {
+                        // Add the new promoted node
+                        const newNodes = [...prev, newNode];
+                        
+                        // Update the group node to remove the promoted node
+                        const updatedNodes = newNodes.map(node => {
+                          if ((node.data as any).isGroupNode && (node.data as any).groupedNodes) {
+                            const updatedGroupedNodes = (node.data as any).groupedNodes.filter((n: any) => n.id !== promotedNodeId);
+                            
+                            // If group becomes empty, remove it entirely
+                            if (updatedGroupedNodes.length === 0) {
+                              return null; // Will be filtered out
+                            }
+                            
+                            // Update the group node with remaining nodes
+                            return {
+                              ...node,
+                              data: {
+                                ...node.data,
+                                groupedNodes: updatedGroupedNodes,
+                                label: `+${updatedGroupedNodes.length} more`
+                              }
+                            };
+                          }
+                          return node;
+                        });
+                        
+                        // Filter out null entries (empty groups) and return properly typed array
+                        return updatedNodes.filter((node): node is Node<NodeCardData> => node !== null);
+                      });
+                      
+                      // Add the new edge
+                      setRfEdges(prev => [...prev, newEdge]);
+                    } else {
+                      console.warn('Could not find parent node for promoted node:', promotedNodeId);
+                      console.log('🔍 Available nodes in graph:', rfNodes.map(n => n.id));
+                      console.log('🔍 Parent edge source:', parentEdge?.source);
+                      
+                      // Try to use TEST.CORE.USER_BASE as fallback parent
+                      const fallbackParent = userBaseNode || null;
+                      console.log('🔍 Using fallback parent:', fallbackParent?.id);
+                      
+                      if (fallbackParent) {
+                        // Use the fallback parent for positioning and connection
+                        const parentPos = fallbackParent.position;
+                        const offsetX = 200;
+                        const offsetY = 100;
+                        
+                        const newNode: Node<NodeCardData> = {
+                          id: promotedNodeId,
+                          type: 'lineage',
+                          data: {
+                            id: promotedNodeId,
+                            name: promotedNode.name,
+                            label: promotedNode.label,
+                            objType: promotedNode.objType,
+                            upstreamExpanded: false,
+                            downstreamExpanded: false,
+                            children: promotedNode.children,
+                            columnsMetadata: promotedNode.columnsMetadata,
+                            dataQualityScore: promotedNode.dataQualityScore,
+                            onPromoteNode: (id: string) => {
+                              console.log('🎯 Promoting node from group:', id);
+                            }
+                          },
+                          position: { 
+                            x: parentPos.x + offsetX, 
+                            y: parentPos.y + offsetY 
+                          }
+                        };
+                        
+                        // Create edge from fallback parent to promoted node
+                        const newEdge: Edge = {
+                          id: `${fallbackParent.id}-${promotedNodeId}`,
+                          source: fallbackParent.id,
+                          target: promotedNodeId,
+                          type: 'custom',
+                          data: {
+                            sourceColumn: '',
+                            targetColumn: '',
+                            relationshipType: 'direct'
+                          }
+                        };
+                        
+                        setRfNodes(prev => {
+                          const newNodes = [...prev, newNode];
+                          
+                          const updatedNodes = newNodes.map(node => {
+                            if ((node.data as any).isGroupNode && (node.data as any).groupedNodes) {
+                              const updatedGroupedNodes = (node.data as any).groupedNodes.filter((n: any) => n.id !== promotedNodeId);
+                              
+                              if (updatedGroupedNodes.length === 0) {
+                                return null;
+                              }
+                              
+                              return {
+                                ...node,
+                                data: {
+                                  ...node.data,
+                                  groupedNodes: updatedGroupedNodes,
+                                  label: `+${updatedGroupedNodes.length} more`
+                                }
+                              };
+                            }
+                            return node;
+                          });
+                          
+                          return updatedNodes.filter((node): node is Node<NodeCardData> => node !== null);
+                        });
+                        
+                        setRfEdges(prev => [...prev, newEdge]);
+                      } else {
+                        // Final fallback: create the promoted node without connection
+                        const newNode: Node<NodeCardData> = {
+                          id: promotedNodeId,
+                          type: 'lineage',
+                          data: {
+                            id: promotedNodeId,
+                            name: promotedNode.name,
+                            label: promotedNode.label,
+                            objType: promotedNode.objType,
+                            upstreamExpanded: false,
+                            downstreamExpanded: false,
+                            children: promotedNode.children,
+                            columnsMetadata: promotedNode.columnsMetadata,
+                            dataQualityScore: promotedNode.dataQualityScore,
+                            onPromoteNode: (id: string) => {
+                              console.log('🎯 Promoting node from group:', id);
+                            }
+                          },
+                          position: { x: Math.random() * 400 + 100, y: Math.random() * 300 + 100 }
+                        };
+                        
+                        setRfNodes(prev => {
+                          const newNodes = [...prev, newNode];
+                          
+                          const updatedNodes = newNodes.map(node => {
+                            if ((node.data as any).isGroupNode && (node.data as any).groupedNodes) {
+                              const updatedGroupedNodes = (node.data as any).groupedNodes.filter((n: any) => n.id !== promotedNodeId);
+                              
+                              if (updatedGroupedNodes.length === 0) {
+                                return null;
+                              }
+                              
+                              return {
+                                ...node,
+                                data: {
+                                  ...node.data,
+                                  groupedNodes: updatedGroupedNodes,
+                                  label: `+${updatedGroupedNodes.length} more`
+                                }
+                              };
+                            }
+                            return node;
+                          });
+                          
+                          return updatedNodes.filter((node): node is Node<NodeCardData> => node !== null);
+                        });
+                      }
+                    }
+                  }
+                }
+              },
+              position: groupNodeData.position
+            };
+            
+            groupNodesToAdd.push(groupNode);
+          }
+        });
+        
+        // Add group nodes to the existing nodes
+        if (groupNodesToAdd.length > 0) {
+          setRfNodes(prev => [...prev, ...groupNodesToAdd]);
+        }
+      }
+
+      // Build edges for visible nodes (including group nodes)
+      const idSet = new Set(savedState.visibleNodeIds);
+      // Add group node IDs to the set for edge building
+      if (savedState.groupNodes) {
+        savedState.groupNodes.forEach((groupNode: any) => {
+          idSet.add(groupNode.id);
+        });
+      }
+      
+      console.log('🔄 Restoring edges (v2):', {
+        visibleNodeIds: Array.from(savedState.visibleNodeIds),
+        groupNodes: savedState.groupNodes?.map((g: any) => g.id) || [],
+        idSet: Array.from(idSet),
+        groupNodesInIdSet: Array.from(idSet).filter((id: unknown) => typeof id === 'string' && id.includes('-group-'))
+      });
+      
+      // Use the buildRfEdges function which handles group node edges properly
+      const edges = buildRfEdges(idSet as Set<string>);
+      setRfEdges(edges as any);
+
+      // Restore viewport after a delay
+      if (savedState.viewport) {
+        setTimeout(() => {
+          setViewport(savedState.viewport);
+          console.log('🔄 Viewport restored:', savedState.viewport);
+        }, 100);
+      }
+
+      console.log('🔄 Complete state restored successfully');
+    } catch (error) {
+      console.error('Failed to restore saved state:', error);
+    }
+  }, [setVisibleNodeIds, setExpandedUpstreamByNode, setExpandedDownstreamByNode, setRfNodes, setRfEdges, setViewport, makeRfNode]);
+
+  const resetToDefaultLayout = useCallback(() => {
+    if (!defaultLayout) {
+      console.log('⚠️ No default layout available');
+      return;
+    }
+    
+    // Clear saved state first to prevent it from being restored
+    setSavedLayout(null);
+    try {
+      localStorage.removeItem('lineage-saved-state');
+      console.log('🗑️ Saved state cleared before reset');
+    } catch (error) {
+      console.error('Failed to clear saved state:', error);
+    }
+    
+    setRfNodes(prev => prev.map(node => ({
+      ...node,
+      position: defaultLayout[node.id] || node.position
+    })));
+    console.log('🔄 Layout reset to default:', Object.keys(defaultLayout).length, 'nodes');
+  }, [defaultLayout, setRfNodes]);
+
+  const clearSavedState = useCallback(() => {
+    setSavedLayout(null);
+    try {
+      localStorage.removeItem('lineage-saved-state');
+      console.log('🗑️ Saved state cleared from localStorage');
+    } catch (error) {
+      console.error('Failed to clear saved state from localStorage:', error);
+    }
+  }, []);
   useEffect(() => void (nodesRef.current = rfNodes), [rfNodes]);
   useEffect(() => void (edgesRef.current = rfEdges), [rfEdges]);
 
@@ -1039,6 +1507,13 @@ function LineageCanvasInner() {
             
             setVisibleNodeIds(currentVisible);
             
+            console.log('🔍 Setting visible nodes:', {
+              nodeId,
+              dir,
+              currentVisible: Array.from(currentVisible),
+              groupNodesInVisible: Array.from(currentVisible).filter(id => id.includes('-group-'))
+            });
+            
             // Track only the nodes that are actually visible after adding new ones
             // This ensures we can properly collapse the same nodes later
             const nodesToTrack = sameSchemaIds.filter(id => currentVisible.has(id));
@@ -1233,6 +1708,17 @@ function LineageCanvasInner() {
     
     setRfNodes(nodes as any);
     setRfEdges([] as any);
+    
+    // Capture default layout positions
+    const defaultPositions: Record<string, { x: number; y: number }> = {};
+    nodes.forEach(node => {
+      if (node) {
+        defaultPositions[node.id] = { x: node.position.x, y: node.position.y };
+      }
+    });
+    setDefaultLayout(defaultPositions);
+    console.log('💾 Default layout captured:', Object.keys(defaultPositions).length, 'nodes');
+    
     setTimeout(() => fitView({ padding: 0.2 }), 0);
   }, [
     setVisibleNodeIds,
@@ -1241,12 +1727,31 @@ function LineageCanvasInner() {
     setRfNodes,
     setRfEdges,
     fitView,
+    ALL_NODE_BY_ID,
+    restoreSavedState,
   ]);
 
   // Initialize on mount
   useEffect(() => {
-    console.log('🎬 Component mounted, calling resetGraph');
-    resetGraph();
+    console.log('🎬 Component mounted, checking for saved state');
+    
+    // Check if there's a saved state first
+    try {
+      const savedStateData = localStorage.getItem('lineage-saved-state');
+      if (savedStateData) {
+        console.log('📂 Found saved state, restoring...');
+        // Restore comprehensive state
+        setTimeout(() => {
+          restoreSavedState();
+        }, 100);
+      } else {
+        console.log('🔄 No saved state found, calling resetGraph');
+        resetGraph();
+      }
+    } catch (error) {
+      console.error('Failed to check saved state on mount:', error);
+      resetGraph();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount
 
@@ -1811,6 +2316,21 @@ function LineageCanvasInner() {
   }, [selectedNodeIds, rfNodes, buildRfEdges, setVisibleNodeIds, setExpandedUpstreamByNode, setExpandedDownstreamByNode, setRfNodes, setRfEdges, selectedNodeId, setSelectedNodeId, closeDrawer, setSelectedNodeIds]);
 
   const filterButtonRef = useRef<HTMLButtonElement>(null);
+  const demoMenuButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Close demo menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showDemoMenu && demoMenuButtonRef.current && !demoMenuButtonRef.current.contains(event.target as HTMLElement)) {
+        setShowDemoMenu(false);
+      }
+    };
+    
+    if (showDemoMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showDemoMenu]);
 
   // Keyboard navigation: Tab to focus nodes, Enter to select
   useEffect(() => {
@@ -2161,17 +2681,19 @@ function LineageCanvasInner() {
 
             {/* Catalog Button - Top Left */}
             <RFPanel position="top-left">
-              <Button
-                variant="secondary"
-                size="md"
-                level="reactflow"
-                onClick={() => setShowCatalog(true)}
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: 6 }}>
-                <path fill-rule="evenodd" clip-rule="evenodd" d="M8.36035 1.00879C12.0588 1.19647 15.0008 4.25493 15.001 8L14.9912 8.36035C14.8035 12.0588 11.7451 15.0008 8 15.001L7.63965 14.9912C3.94127 14.8035 1.00026 11.745 1 8C1.00013 4.13407 4.13407 0.999155 8 0.999023L8.36035 1.00879ZM5.80664 10.75C5.96371 11.4164 6.17313 12.0093 6.41992 12.5029C6.96354 13.5899 7.53888 13.9544 7.9248 13.9961L8 14.001C8.38368 14.0009 9.00093 13.663 9.58105 12.5029C9.82785 12.0093 10.0375 11.4165 10.1943 10.75H5.80664ZM2.66797 10.75C3.35164 12.0729 4.51115 13.1099 5.92188 13.6309C5.42438 12.895 5.02768 11.9023 4.78125 10.75H2.66797ZM11.2188 10.75C10.9725 11.9016 10.5761 12.894 10.0791 13.6299C11.4893 13.1088 12.6484 12.0724 13.332 10.75H11.2188ZM2.22363 6.375C2.07858 6.89177 2.00002 7.43689 2 8C2.00005 8.60882 2.09114 9.19628 2.25977 9.75H4.61035C4.53835 9.19066 4.50002 8.60428 4.5 8C4.50001 7.44071 4.53374 6.89638 4.5957 6.375H2.22363ZM5.60254 6.375C5.53618 6.88953 5.50001 7.43424 5.5 8C5.50002 8.61204 5.543 9.19875 5.62012 9.75H10.3799C10.4569 9.19874 10.5 8.61202 10.5 8C10.5 7.43424 10.4637 6.88952 10.3975 6.375H5.60254ZM11.4043 6.375C11.4663 6.89637 11.5 7.44072 11.5 8C11.5 8.60425 11.4616 9.19066 11.3896 9.75H13.7402C13.9089 9.19625 14.0009 8.60885 14.001 8C14.001 7.43686 13.9215 6.89179 13.7764 6.375H11.4043ZM5.9209 2.36914C4.46603 2.90653 3.27729 3.99232 2.60352 5.375H4.75488C4.9988 4.16971 5.40569 3.13153 5.9209 2.36914ZM8 2C7.61634 2.00007 7.00003 2.33711 6.41992 3.49707C6.15778 4.02144 5.93801 4.65728 5.77832 5.375H10.2227C10.0632 4.65727 9.84319 4.02145 9.58105 3.49707C9.00092 2.33691 8.38369 2.00009 8 2ZM10.0791 2.36914C10.5942 3.1315 11.0002 4.16983 11.2441 5.375H13.3975C12.7236 3.99225 11.5341 2.90659 10.0791 2.36914Z" fill="#5D6A85"/>
-                </svg>
-                Catalog
-              </Button>
+              {!showCatalog && (
+                <Button
+                  variant="secondary"
+                  size="md"
+                  level="reactflow"
+                  onClick={() => setShowCatalog(true)}
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: 6 }}>
+                  <path fill-rule="evenodd" clip-rule="evenodd" d="M8.36035 1.00879C12.0588 1.19647 15.0008 4.25493 15.001 8L14.9912 8.36035C14.8035 12.0588 11.7451 15.0008 8 15.001L7.63965 14.9912C3.94127 14.8035 1.00026 11.745 1 8C1.00013 4.13407 4.13407 0.999155 8 0.999023L8.36035 1.00879ZM5.80664 10.75C5.96371 11.4164 6.17313 12.0093 6.41992 12.5029C6.96354 13.5899 7.53888 13.9544 7.9248 13.9961L8 14.001C8.38368 14.0009 9.00093 13.663 9.58105 12.5029C9.82785 12.0093 10.0375 11.4165 10.1943 10.75H5.80664ZM2.66797 10.75C3.35164 12.0729 4.51115 13.1099 5.92188 13.6309C5.42438 12.895 5.02768 11.9023 4.78125 10.75H2.66797ZM11.2188 10.75C10.9725 11.9016 10.5761 12.894 10.0791 13.6299C11.4893 13.1088 12.6484 12.0724 13.332 10.75H11.2188ZM2.22363 6.375C2.07858 6.89177 2.00002 7.43689 2 8C2.00005 8.60882 2.09114 9.19628 2.25977 9.75H4.61035C4.53835 9.19066 4.50002 8.60428 4.5 8C4.50001 7.44071 4.53374 6.89638 4.5957 6.375H2.22363ZM5.60254 6.375C5.53618 6.88953 5.50001 7.43424 5.5 8C5.50002 8.61204 5.543 9.19875 5.62012 9.75H10.3799C10.4569 9.19874 10.5 8.61202 10.5 8C10.5 7.43424 10.4637 6.88952 10.3975 6.375H5.60254ZM11.4043 6.375C11.4663 6.89637 11.5 7.44072 11.5 8C11.5 8.60425 11.4616 9.19066 11.3896 9.75H13.7402C13.9089 9.19625 14.0009 8.60885 14.001 8C14.001 7.43686 13.9215 6.89179 13.7764 6.375H11.4043ZM5.9209 2.36914C4.46603 2.90653 3.27729 3.99232 2.60352 5.375H4.75488C4.9988 4.16971 5.40569 3.13153 5.9209 2.36914ZM8 2C7.61634 2.00007 7.00003 2.33711 6.41992 3.49707C6.15778 4.02144 5.93801 4.65728 5.77832 5.375H10.2227C10.0632 4.65727 9.84319 4.02145 9.58105 3.49707C9.00092 2.33691 8.38369 2.00009 8 2ZM10.0791 2.36914C10.5942 3.1315 11.0002 4.16983 11.2441 5.375H13.3975C12.7236 3.99225 11.5341 2.90659 10.0791 2.36914Z" fill="#5D6A85"/>
+                  </svg>
+                  Catalog
+                </Button>
+              )}
             </RFPanel>
             
             <RFPanel position="top-right">
@@ -2200,6 +2722,62 @@ function LineageCanvasInner() {
                 >
                   Filter
                 </Button>
+                
+                        {/* State Management Buttons */}
+                        <Button 
+                          variant="secondary" 
+                          size="md"
+                          level="reactflow"
+                          onClick={saveCurrentState}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H2zm0 1h12v12H2V2zm2 2a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H4zm0 1h8v6H4V4z"/>
+                          </svg>
+                          Save State
+                        </Button>
+                        
+                        <Button 
+                          variant="secondary" 
+                          size="md"
+                          level="reactflow"
+                          onClick={restoreSavedState}
+                          disabled={!savedLayout}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+                            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+                          </svg>
+                          Restore State
+                        </Button>
+                
+                <Button 
+                  variant="secondary" 
+                  size="md"
+                  level="reactflow"
+                  onClick={resetToDefaultLayout}
+                  disabled={!defaultLayout}
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2v1z"/>
+                    <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466z"/>
+                  </svg>
+                  Reset
+                </Button>
+                
+                        <Button 
+                          variant="secondary" 
+                          size="md"
+                          level="reactflow"
+                          onClick={clearSavedState}
+                          disabled={!savedLayout}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5z"/>
+                            <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                          </svg>
+                          Clear Saved
+                        </Button>
+                
                 <Button 
                   variant="secondary" 
                   size="md"
@@ -2224,6 +2802,28 @@ function LineageCanvasInner() {
                 >
                   Reset
                 </Button>
+                
+                {/* Demo Menu Overflow Button */}
+                <Button 
+                  ref={demoMenuButtonRef}
+                  variant="secondary" 
+                  size="md"
+                  level="reactflow"
+                  onClick={() => {
+                    console.log('Demo menu button clicked, current state:', showDemoMenu);
+                    setShowDemoMenu(!showDemoMenu);
+                  }}
+                  style={{ 
+                    backgroundColor: showDemoMenu ? '#e5e7eb' : undefined,
+                    border: '1px solid #d1d5db'
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <circle cx="3" cy="8" r="1.5" />
+                    <circle cx="8" cy="8" r="1.5" />
+                    <circle cx="13" cy="8" r="1.5" />
+                  </svg>
+                </Button>
               </div>
                   
                   {/* Filter Popover for default controls */}
@@ -2235,6 +2835,67 @@ function LineageCanvasInner() {
                     showDirectionOptions={false} // No direction options when no nodes selected
                     anchorRef={filterButtonRef}
                   />
+                  
+                  {/* Demo Menu Popover */}
+                  {showDemoMenu && (
+                    <div
+                      className="overflow-menu"
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        right: 0,
+                        marginTop: 8,
+                        zIndex: 10000,
+                        minWidth: '180px',
+                        backgroundColor: 'white',
+                        border: '2px solid #ef4444', // Red border for debugging
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        pointerEvents: 'auto',
+                      }}
+                      onClick={(e) => {
+                        console.log('Demo menu clicked');
+                        e.stopPropagation();
+                      }}
+                    >
+                      <div 
+                        className="overflow-menu-item"
+                        onClick={() => {
+                          onDemoModeChange?.('basic');
+                          setShowDemoMenu(false);
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: 8 }}>
+                          <path d="M8 1C11.866 1 15 4.13401 15 8C15 11.866 11.866 15 8 15C4.13401 15 1 11.866 1 8C1 4.13401 4.13401 1 8 1ZM8 2C4.68629 2 2 4.68629 2 8C2 11.3137 4.68629 14 8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2Z" fill="currentColor"/>
+                        </svg>
+                        Basic Demo
+                      </div>
+                      <div 
+                        className="overflow-menu-item"
+                        onClick={() => {
+                          onDemoModeChange?.('advanced');
+                          setShowDemoMenu(false);
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: 8 }}>
+                          <path d="M8 1C11.866 1 15 4.13401 15 8C15 11.866 11.866 15 8 15C4.13401 15 1 11.866 1 8C1 4.13401 4.13401 1 8 1ZM8 2C4.68629 2 2 4.68629 2 8C2 11.3137 4.68629 14 8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2Z" fill="currentColor"/>
+                        </svg>
+                        Advanced Demo
+                      </div>
+                      <div 
+                        className="overflow-menu-item"
+                        onClick={() => {
+                          onDemoModeChange?.('dynamic');
+                          setShowDemoMenu(false);
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: 8 }}>
+                          <path d="M8 1C11.866 1 15 4.13401 15 8C15 11.866 11.866 15 8 15C4.13401 15 1 11.866 1 8C1 4.13401 4.13401 1 8 1ZM8 2C4.68629 2 2 4.68629 2 8C2 11.3137 4.68629 14 8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2Z" fill="currentColor"/>
+                        </svg>
+                        Dynamic Relationships
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </RFPanel>
@@ -2582,13 +3243,17 @@ function LineageCanvasInner() {
   );
 }
 
-export function GraphView() {
+interface GraphViewProps {
+  onDemoModeChange?: (mode: 'basic' | 'advanced' | 'dynamic') => void;
+}
+
+export function GraphView({ onDemoModeChange }: GraphViewProps = {}) {
   return (
     <div style={{ display: 'grid', gap: 8 }}>
       <div className={container.root}>
         <ReactFlowProvider>
           <GraphProvider>
-            <LineageCanvasInner />
+            <LineageCanvasInner onDemoModeChange={onDemoModeChange} />
           </GraphProvider>
         </ReactFlowProvider>
       </div>

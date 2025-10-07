@@ -21,7 +21,7 @@ export type NodeCardData = {
   createdTimestamp?: string;
   error?: string | string[]; // Single error message or array of error messages
   warning?: string | string[]; // Single warning message or array of warning messages
-  children?: Array<{ name: string; type: string; selected?: boolean }>; // columns or child objects
+  children?: Array<{ name: string; type: string; selected?: boolean }>; // columns or features
   selectedChildren?: Set<string>; // Track selected column names (auto-selected by app)
   focusedChild?: string; // Track explicitly focused column (user clicked)
   columnsMetadata?: ColumnMetadata[]; // Detailed column metadata for side panel
@@ -164,7 +164,7 @@ function ColumnTypeIcon({ type }: { type: string }) {
     );
   }
   
-  if (normalizedType.includes('INTEGER') || normalizedType.includes('INT') || normalizedType.includes('BIGINT')) {
+  if (normalizedType.includes('INTEGER') || normalizedType.includes('INT') || normalizedType.includes('BIGINT') || normalizedType.includes('NUMBER')) {
     return (
       <svg {...iconProps} viewBox="0 0 16 16" fill="currentColor">
         <path fill-rule="evenodd" clip-rule="evenodd" d="M6 5H10V2H11V5H14V6H11V10H14V11H11V14H10V11H6V14H5V11H2V10H5V6H2V5H5V2H6V5ZM6 6V10H10V6H6Z" fill="#5D6A85"/>
@@ -777,7 +777,7 @@ export function NodeCard({ data }: { data: NodeCardData }) {
   const [childrenListHeight, setChildrenListHeight] = useState<number>(206); // Default height
   const [isAutoExpanded, setIsAutoExpanded] = useState<boolean>(false); // Track if auto-expanded
   const [isDragging, setIsDragging] = useState(false);
-  const [searchQuery, setSearchQuery] = useState<string>(''); // Search query for filtering columns
+  const [searchQuery, setSearchQuery] = useState<string>(''); // Search query for filtering children
   const dragStartRef = useRef<{ y: number; height: number } | null>(null);
   const lastClickTimeRef = useRef<number>(0);
   const [isHovered, setIsHovered] = useState(false);
@@ -1132,13 +1132,13 @@ export function NodeCard({ data }: { data: NodeCardData }) {
             onMouseLeave={handleToolbarMouseLeave}
           >
             <IconButton
-              aria-label={data.childrenExpanded ? "Hide columns" : "View children"}
+              aria-label={data.childrenExpanded ? `Hide ${data.objType === 'MODEL' ? 'features' : 'columns'}` : `View ${data.objType === 'MODEL' ? 'features' : 'children'}`}
               onClick={() => data.onToggleChildren?.()}
               size="sm"
               variant="secondary"
               level="nodecard"
             >
-              {data.childrenExpanded ? 'Hide columns' : `${data.children.length} columns`}
+              {data.childrenExpanded ? `Hide ${data.objType === 'MODEL' ? 'features' : 'columns'}` : `${data.children.length} ${data.objType === 'MODEL' ? 'features' : 'columns'}`}
             </IconButton>
           </div>
         </NodeToolbar>
@@ -1181,7 +1181,7 @@ export function NodeCard({ data }: { data: NodeCardData }) {
           </div>
           <div className={nodeCard.header} title={data.name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              {data.name}
+              {data.name.split('.').slice(0, 2).join('.')}
             </div>
           </div>
         </div>
@@ -1267,7 +1267,7 @@ export function NodeCard({ data }: { data: NodeCardData }) {
           >
             {data.children
               .filter(child => {
-                // Filter columns based on search query
+                // Filter children based on search query
                 if (!searchQuery.trim()) return true;
                 const query = searchQuery.toLowerCase();
                 return child.name.toLowerCase().includes(query) || 

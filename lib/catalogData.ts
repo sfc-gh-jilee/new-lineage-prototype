@@ -20,11 +20,47 @@ function n(
     warnings?: number;
     dataFreshness?: 'fresh' | 'stale' | 'outdated' | 'unknown';
     certificationStatus?: 'certified' | 'pending' | 'deprecated' | 'none';
+    
+    // Dynamic relationship discovery
+    upstreamReferences?: string[]; // References to upstream nodes
+    downstreamReferences?: string[]; // References to downstream nodes
+    
+    // Column-level lineage metadata
+    columnLineage?: {
+      [columnName: string]: {
+        upstreamColumns?: string[]; // e.g., ["DW.SALES.ORDERS.ORDER_ID", "DW.CUSTOMERS.CUSTOMER_ID"]
+        downstreamColumns?: string[]; // e.g., ["DW.ANALYTICS.ORDER_SUMMARY.ORDER_ID"]
+        transformationType?: string; // e.g., "join", "aggregate", "filter"
+        dataQuality?: number; // 0-100
+      };
+    };
+    
+    // Model-specific metadata
+    modelType?: string; // e.g., "classification", "regression", "recommendation"
+    algorithm?: string; // e.g., "random_forest", "neural_network"
+    accuracy?: number; // Model accuracy score
+    features?: string[]; // List of features used by the model
   }
 ): any {
   // Format label as all caps
   const formattedLabel = label.toUpperCase();
   const fullPath = `${db}.${schema}.${formattedLabel}`;
+  
+  // Debug logging for models
+  if (objType === 'MODEL') {
+    console.log('🔍 Model node (v3):', { 
+      id, 
+      objType, 
+      hasMetadata: !!metadata, 
+      hasFeatures: !!metadata?.features, 
+      features: metadata?.features,
+      metadataKeys: metadata ? Object.keys(metadata) : [],
+      willUseFeatures: !!(objType === 'MODEL' && metadata && metadata.features),
+      childrenWillBe: objType === 'MODEL' && metadata && metadata.features 
+        ? metadata.features.map(feature => ({ name: feature, type: 'feature' }))
+        : cols.map(col => ({ name: col.name, type: col.type }))
+    });
+  }
   
   return {
     id,
@@ -33,7 +69,9 @@ function n(
     objType,
     db,
     schema,
-    columns: cols,
+    children: objType === 'MODEL' && metadata && metadata.features 
+      ? metadata.features.map(feature => ({ name: feature, type: 'feature' })) // Use features for models
+      : cols.map(col => ({ name: col.name, type: col.type })), // Use columns for tables/views
     upstreamExpanded: false,
     downstreamExpanded: false,
     hasUpstream: true,
@@ -58,8 +96,8 @@ function e(source: string, target: string, relation?: string): LineageEdge {
   };
 }
 
-function col(name: string, type: string): ColumnMetadata {
-  return { name, type };
+function col(name: string, type: string, description?: string): ColumnMetadata {
+  return { name, type, description };
 }
 
 // ============ CATALOG NODES ============
@@ -110,12 +148,12 @@ export const ALL_CATALOG_NODES: LineageNode[] = [
     certificationStatus: 'certified',
   }),
   n('DW.MARKETING.AD_CLICKS', 'ad_clicks', 'TABLE', 'DW', 'MARKETING', [
-    col('click_id', 'NUMBER'),
-    col('impression_id', 'NUMBER'),
-    col('campaign_id', 'NUMBER'),
-    col('user_id', 'NUMBER'),
-    col('click_time', 'TIMESTAMP'),
-    col('landing_page', 'VARCHAR'),
+    col('click_id', 'NUMBER', 'Unique identifier for each click event'),
+    col('impression_id', 'NUMBER', 'Reference to the ad impression that generated this click'),
+    col('campaign_id', 'NUMBER', 'ID of the marketing campaign'),
+    col('user_id', 'NUMBER', 'ID of the user who clicked'),
+    col('click_time', 'TIMESTAMP', 'Timestamp when the click occurred'),
+    col('landing_page', 'VARCHAR', 'URL of the landing page'),
   ], {
     qualityScore: 85,
     lastRefreshed: '2025-10-06T11:50:00Z',
@@ -128,6 +166,29 @@ export const ALL_CATALOG_NODES: LineageNode[] = [
     warnings: 0,
     dataFreshness: 'fresh',
     certificationStatus: 'certified',
+    
+    // Dynamic relationship discovery
+    upstreamReferences: ['DW.MARKETING.AD_IMPRESSIONS', 'DW.CUSTOMERS.CUSTOMER_BASE'],
+    downstreamReferences: ['DW.ANALYTICS.CONVERSION_FUNNEL', 'DW.ANALYTICS.REVENUE_ATTRIBUTION'],
+    
+    // Column-level lineage
+    columnLineage: {
+      'impression_id': {
+        upstreamColumns: ['DW.MARKETING.AD_IMPRESSIONS.impression_id'],
+        transformationType: 'direct_copy',
+        dataQuality: 100
+      },
+      'user_id': {
+        upstreamColumns: ['DW.CUSTOMERS.CUSTOMER_BASE.customer_id'],
+        transformationType: 'lookup',
+        dataQuality: 95
+      },
+      'campaign_id': {
+        upstreamColumns: ['DW.MARKETING.AD_IMPRESSIONS.campaign_id'],
+        transformationType: 'direct_copy',
+        dataQuality: 100
+      }
+    }
   }),
   n('DW.MARKETING.EMAIL_CAMPAIGNS', 'email_campaigns', 'TABLE', 'DW', 'MARKETING', [
     col('email_campaign_id', 'NUMBER'),
@@ -362,6 +423,68 @@ export const ALL_CATALOG_NODES: LineageNode[] = [
     col('sales', 'NUMBER'),
     col('target', 'NUMBER'),
   ]),
+
+  // Machine Learning Models
+  n('ML.CUSTOMER_CHURN_MODEL', 'customer_churn_model', 'MODEL', 'ML', 'CUSTOMER', [], {
+    qualityScore: 88,
+    lastRefreshed: '2025-10-06T14:30:00Z',
+    rowCount: 125000,
+    sizeBytes: 52428800,
+    owner: 'ml_team@company.com',
+    description: 'Machine learning model for predicting customer churn',
+    tags: ['ml', 'churn', 'prediction', 'customer'],
+    errors: 0,
+    warnings: 3,
+    dataFreshness: 'fresh',
+    certificationStatus: 'certified',
+    
+    // Model-specific metadata
+    modelType: 'classification',
+    algorithm: 'random_forest',
+    accuracy: 0.87,
+    features: [
+      'customer_age',
+      'total_orders',
+      'avg_order_value',
+      'days_since_last_order',
+      'support_tickets',
+      'payment_method',
+      'subscription_type'
+    ],
+    
+    upstreamReferences: ['DW.USERS.CUSTOMERS', 'DW.SALES.ORDERS', 'DW.SALES.PAYMENTS'],
+    downstreamReferences: ['DW.ANALYTICS.CHURN_ANALYSIS', 'DW.MARKETING.RETENTION_CAMPAIGNS'],
+  }),
+
+  n('ML.RECOMMENDATION_MODEL', 'recommendation_model', 'MODEL', 'ML', 'PRODUCT', [], {
+    qualityScore: 91,
+    lastRefreshed: '2025-10-06T15:00:00Z',
+    rowCount: 2500000,
+    sizeBytes: 104857600,
+    owner: 'ml_team@company.com',
+    description: 'Collaborative filtering model for product recommendations',
+    tags: ['ml', 'recommendation', 'collaborative_filtering'],
+    errors: 0,
+    warnings: 1,
+    dataFreshness: 'fresh',
+    certificationStatus: 'certified',
+    
+    // Model-specific metadata
+    modelType: 'recommendation',
+    algorithm: 'matrix_factorization',
+    accuracy: 0.82,
+    features: [
+      'user_purchase_history',
+      'product_categories',
+      'user_demographics',
+      'seasonal_patterns',
+      'price_sensitivity',
+      'brand_preferences'
+    ],
+    
+    upstreamReferences: ['DW.USERS.CUSTOMERS', 'DW.PRODUCTS.CATALOG', 'DW.SALES.ORDER_ITEMS'],
+    downstreamReferences: ['DW.ANALYTICS.RECOMMENDATION_PERFORMANCE'],
+  }),
 ];
 
 // ============ CATALOG EDGES ============
@@ -429,23 +552,23 @@ export const CATALOG_TREE: CatalogTree = [
     schemas: [
       {
         schema: 'MARKETING',
-        objects: ALL_CATALOG_NODES.filter(n => n.db === 'DW' && n.schema === 'MARKETING'),
+        objects: ALL_CATALOG_NODES.filter(n => (n as any).db === 'DW' && (n as any).schema === 'MARKETING'),
       },
       {
         schema: 'PRODUCTS',
-        objects: ALL_CATALOG_NODES.filter(n => n.db === 'DW' && n.schema === 'PRODUCTS'),
+        objects: ALL_CATALOG_NODES.filter(n => (n as any).db === 'DW' && (n as any).schema === 'PRODUCTS'),
       },
       {
         schema: 'USERS',
-        objects: ALL_CATALOG_NODES.filter(n => n.db === 'DW' && n.schema === 'USERS'),
+        objects: ALL_CATALOG_NODES.filter(n => (n as any).db === 'DW' && (n as any).schema === 'USERS'),
       },
       {
         schema: 'SALES',
-        objects: ALL_CATALOG_NODES.filter(n => n.db === 'DW' && n.schema === 'SALES'),
+        objects: ALL_CATALOG_NODES.filter(n => (n as any).db === 'DW' && (n as any).schema === 'SALES'),
       },
       {
         schema: 'FINANCE',
-        objects: ALL_CATALOG_NODES.filter(n => n.db === 'DW' && n.schema === 'FINANCE'),
+        objects: ALL_CATALOG_NODES.filter(n => (n as any).db === 'DW' && (n as any).schema === 'FINANCE'),
       },
     ],
   },
@@ -454,7 +577,7 @@ export const CATALOG_TREE: CatalogTree = [
     schemas: [
       {
         schema: 'REPORTING',
-        objects: ALL_CATALOG_NODES.filter(n => n.db === 'ANALYTICS' && n.schema === 'REPORTING'),
+        objects: ALL_CATALOG_NODES.filter(n => (n as any).db === 'ANALYTICS' && (n as any).schema === 'REPORTING'),
       },
     ],
   },
@@ -463,7 +586,20 @@ export const CATALOG_TREE: CatalogTree = [
     schemas: [
       {
         schema: 'DASHBOARDS',
-        objects: ALL_CATALOG_NODES.filter(n => n.db === 'BI' && n.schema === 'DASHBOARDS'),
+        objects: ALL_CATALOG_NODES.filter(n => (n as any).db === 'BI' && (n as any).schema === 'DASHBOARDS'),
+      },
+    ],
+  },
+  {
+    database: 'ML',
+    schemas: [
+      {
+        schema: 'CUSTOMER',
+        objects: ALL_CATALOG_NODES.filter(n => (n as any).db === 'ML' && (n as any).schema === 'CUSTOMER'),
+      },
+      {
+        schema: 'PRODUCT',
+        objects: ALL_CATALOG_NODES.filter(n => (n as any).db === 'ML' && (n as any).schema === 'PRODUCT'),
       },
     ],
   },

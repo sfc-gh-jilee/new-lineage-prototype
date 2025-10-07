@@ -1380,7 +1380,8 @@ hr {
   align-items: center;
   justify-content: center;
   background-color: var(--level2-background-color);
-  border: 1px solid var(--border-color);
+  border:1px solid transparent;
+  /* border: 1px solid var(--border-color); */
   border-radius: var(--border-radius-rg);
   cursor: pointer;
   transition: all 0.12s ease;
@@ -1423,7 +1424,7 @@ hr {
   top: 16px;
   left: 16px;
   width: 320px;
-  height: 600px;
+  max-height: 600px;
   background-color: var(--level2-background-color);
   box-shadow: var(--shadow);
   z-index: 9999;
