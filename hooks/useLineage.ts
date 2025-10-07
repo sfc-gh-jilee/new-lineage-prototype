@@ -1,24 +1,59 @@
 import { useMemo } from 'react';
 import { CHILDREN, PARENTS } from '../lib/mockData';
+import { ALL_CATALOG_EDGES } from '../lib/catalogData';
 
 export function usePeek(nodeId: string, dir: 'up' | 'down') {
+  // Create combined mappings that include both original and catalog edges
+  const allChildren = useMemo(() => {
+    const combined = { ...CHILDREN };
+    ALL_CATALOG_EDGES.forEach(({ source, target }) => {
+      (combined[source] ||= []).push(target);
+    });
+    return combined;
+  }, []);
+
+  const allParents = useMemo(() => {
+    const combined = { ...PARENTS };
+    ALL_CATALOG_EDGES.forEach(({ source, target }) => {
+      (combined[target] ||= []).push(source);
+    });
+    return combined;
+  }, []);
+
   return {
     data: useMemo(
       () => ({
-        count: dir === 'up' ? PARENTS[nodeId]?.length || 0 : CHILDREN[nodeId]?.length || 0,
+        count: dir === 'up' ? allParents[nodeId]?.length || 0 : allChildren[nodeId]?.length || 0,
       }),
-      [nodeId, dir],
+      [nodeId, dir, allParents, allChildren],
     ),
   } as const;
 }
 
 export function useExpand() {
+  // Create combined mappings that include both original and catalog edges
+  const allChildren = useMemo(() => {
+    const combined = { ...CHILDREN };
+    ALL_CATALOG_EDGES.forEach(({ source, target }) => {
+      (combined[source] ||= []).push(target);
+    });
+    return combined;
+  }, []);
+
+  const allParents = useMemo(() => {
+    const combined = { ...PARENTS };
+    ALL_CATALOG_EDGES.forEach(({ source, target }) => {
+      (combined[target] ||= []).push(source);
+    });
+    return combined;
+  }, []);
+
   return {
     mutate(
       { nodeId, dir }: { nodeId: string; dir: 'up' | 'down' },
       opts: { onSuccess?: (res: { ids: string[] }) => void },
     ) {
-      const ids = dir === 'up' ? PARENTS[nodeId] || [] : CHILDREN[nodeId] || [];
+      const ids = dir === 'up' ? allParents[nodeId] || [] : allChildren[nodeId] || [];
       // simulate async
       setTimeout(() => opts.onSuccess?.({ ids }), 0);
     },

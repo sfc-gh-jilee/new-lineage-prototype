@@ -20,6 +20,7 @@ import 'reactflow/dist/style.css';
 import { Drawer } from './components/Drawer';
 import { ContextualActionBar } from './components/ContextualActionBar';
 import { FilterPopover, type FilterOptions } from './components/FilterPopover';
+import { CatalogPanel } from './components/CatalogPanel';
 import { customEdgeTypes } from './components/CustomEdge';
 import { NodeCard, type NodeCardData } from './components/NodeCard';
 import { GraphProvider, useGraphVisibility } from './context/GraphContext';
@@ -27,6 +28,8 @@ import { useExpand } from './hooks/useLineage';
 import { useHistory, type HistoryState } from './hooks/useHistory';
 import { elkLayout } from './lib/elkLayout';
 import { ALL_EDGES, NODE_BY_ID, COLUMN_LINEAGE, ALL_NODES } from './lib/mockData';
+import { ALL_CATALOG_NODES } from './lib/catalogData';
+import { ALL_CATALOG_EDGES } from './lib/catalogData';
 import type { LineageNode } from './lib/types';
 import { container } from './styles.stylex';
 
@@ -169,6 +172,15 @@ function LineageCanvasInner() {
     setExpandedDownstreamByNode,
   } = useGraphVisibility();
 
+  // Create combined node lookup that includes both original and catalog nodes
+  const ALL_NODE_BY_ID = useMemo(() => {
+    const combined = new Map(NODE_BY_ID);
+    ALL_CATALOG_NODES.forEach(node => {
+      combined.set(node.id, node);
+    });
+    return combined;
+  }, []);
+
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState<NodeCardData>([]);
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState<EdgeData>([]);
 
@@ -200,8 +212,9 @@ function LineageCanvasInner() {
     columnName: string;
   } | null>(null);
   const [showAllChildren, setShowAllChildren] = useState<boolean>(false);
+  const [showCatalog, setShowCatalog] = useState(false);
 
-  const { fitView, getViewport, setViewport } = useReactFlow();
+  const { fitView, getViewport, setViewport, screenToFlowPosition } = useReactFlow();
   const nodesRef = useRef<Node<NodeCardData>[]>([]);
   const edgesRef = useRef<Edge<EdgeData>[]>([]);
   useEffect(() => void (nodesRef.current = rfNodes), [rfNodes]);
@@ -570,7 +583,9 @@ function LineageCanvasInner() {
 
   const buildRfEdges = useCallback((ids: Set<string>) => {
     const idSet = new Set(ids);
-    const edges = ALL_EDGES.filter(({ source, target }) => idSet.has(source) && idSet.has(target)).map(
+    // Combine both original and catalog edges
+    const allEdges = [...ALL_EDGES, ...ALL_CATALOG_EDGES];
+    const edges = allEdges.filter(({ source, target }) => idSet.has(source) && idSet.has(target)).map(
       (e) =>
         ({
           id: e.id,
@@ -772,20 +787,33 @@ function LineageCanvasInner() {
             const currentVisible = new Set(visibleNodeIds);
             // Always ensure the parent node is in the visible set
             currentVisible.add(nodeId);
-            const toAdd = ids.filter((id) => !currentVisible.has(id));
-            console.log('🔓 handleExpand onSuccess', nodeId, dir, 'found:', ids.length, 'toAdd:', toAdd.length);
+            
+            // Filter to only show nodes from the same schema as the parent node
+            const parentNode = ALL_NODE_BY_ID.get(nodeId);
+            const parentSchema = parentNode ? `${(parentNode as any).db}.${(parentNode as any).schema}` : null;
+            
+            const sameSchemaIds = parentSchema 
+              ? ids.filter(id => {
+                  const node = ALL_NODE_BY_ID.get(id);
+                  return node && `${(node as any).db}.${(node as any).schema}` === parentSchema;
+                })
+              : ids;
+            
+            const toAdd = sameSchemaIds.filter((id) => !currentVisible.has(id));
+            console.log('🔓 handleExpand onSuccess', nodeId, dir, 'found:', ids.length, 'sameSchema:', sameSchemaIds.length, 'toAdd:', toAdd.length);
             if (toAdd.length === 0) {
               console.log('⚠️ No new nodes to add - all already visible. Updating expanded flag and tracking.');
-              // Still need to update tracking state even though nodes are already visible
+              // Track only the nodes that are actually visible (not all possible nodes)
+              const visibleDownstreamNodes = sameSchemaIds.filter(id => currentVisible.has(id));
               if (dir === 'up') {
                 setExpandedUpstreamByNode((m) => ({
                   ...m,
-                  [nodeId]: new Set(ids), // Track all found nodes
+                  [nodeId]: new Set(visibleDownstreamNodes), // Track only visible nodes
                 }));
               } else {
                 setExpandedDownstreamByNode((m) => ({
                   ...m,
-                  [nodeId]: new Set(ids), // Track all found nodes
+                  [nodeId]: new Set(visibleDownstreamNodes), // Track only visible nodes
                 }));
               }
               setRfNodes(
@@ -832,7 +860,7 @@ function LineageCanvasInner() {
               // Create normal nodes
               const positions = placeNeighbors(parent, SHOW_NORMAL + 1, dir); // +1 for group node
               normalNodeIds.forEach((id, i) => {
-                const base = NODE_BY_ID.get(id)!;
+                const base = ALL_NODE_BY_ID.get(id)!;
                 const rf = makeRfNode({
                   ...base,
                   upstreamExpanded: false,
@@ -844,7 +872,7 @@ function LineageCanvasInner() {
               
               // Create group node as a special NodeCard
               const groupNodeId = `${nodeId}-group-${dir}`;
-              const groupedNodes = groupedNodeIds.map(id => NODE_BY_ID.get(id)!);
+              const groupedNodes = groupedNodeIds.map(id => ALL_NODE_BY_ID.get(id)!);
               console.log('📦 Group node details:', {
                 groupNodeId,
                 groupedNodeCount: groupedNodes.length,
@@ -911,7 +939,7 @@ function LineageCanvasInner() {
                     const newPositions = placeNeighbors(parent, totalAfterPromotion, dir);
                     
                     // Create the promoted node
-                    const promotedNode = NODE_BY_ID.get(promotedNodeId)!;
+                    const promotedNode = ALL_NODE_BY_ID.get(promotedNodeId)!;
                     const rf = makeRfNode({
                       ...promotedNode,
                       upstreamExpanded: false,
@@ -997,7 +1025,7 @@ function LineageCanvasInner() {
               // Original logic for <= 10 nodes
               const positions = placeNeighbors(parent, toAdd.length, dir);
               newNodes = toAdd.map((id, i) => {
-                const base = NODE_BY_ID.get(id)!;
+                const base = ALL_NODE_BY_ID.get(id)!;
                 const rf = makeRfNode({
                   ...base,
                   upstreamExpanded: false,
@@ -1011,19 +1039,19 @@ function LineageCanvasInner() {
             
             setVisibleNodeIds(currentVisible);
             
-            // Track which nodes were actually added by THIS expand operation
-            // This should only include the nodes we just made visible, not all visible nodes
-            const nodesToTrack = newNodes.map(n => n.id);
+            // Track only the nodes that are actually visible after adding new ones
+            // This ensures we can properly collapse the same nodes later
+            const nodesToTrack = sameSchemaIds.filter(id => currentVisible.has(id));
             
             if (dir === 'up') {
               setExpandedUpstreamByNode((m) => ({
                 ...m,
-                [nodeId]: new Set([...(m[nodeId] || []), ...nodesToTrack]),
+                [nodeId]: new Set(nodesToTrack), // Replace, don't add
               }));
             } else {
               setExpandedDownstreamByNode((m) => ({
                 ...m,
-                [nodeId]: new Set([...(m[nodeId] || []), ...nodesToTrack]),
+                [nodeId]: new Set(nodesToTrack), // Replace, don't add
               }));
             }
             setRfNodes(
@@ -1195,7 +1223,7 @@ function LineageCanvasInner() {
     
     // Create both nodes
     const nodes = initialNodeIds.map((id, index) => {
-      const node = NODE_BY_ID.get(id);
+      const node = ALL_NODE_BY_ID.get(id);
       if (!node) return null;
       const rfNode = makeRfNode({ ...node, upstreamExpanded: false, downstreamExpanded: false });
       // Position them horizontally
@@ -1229,12 +1257,12 @@ function LineageCanvasInner() {
         return n;
       }
       
-      // Use the expanded state already stored in node data (set by handleExpand/handleCollapse)
-      // This is the source of truth for UI state
-      const upstreamExpanded = (n.data as NodeCardData).upstreamExpanded || false;
-      const downstreamExpanded = (n.data as NodeCardData).downstreamExpanded || false;
+      // Use the context state as the source of truth for expansion state
+      const upstreamExpanded = (expandedUpstreamByNode[n.id]?.size || 0) > 0;
+      const downstreamExpanded = (expandedDownstreamByNode[n.id]?.size || 0) > 0;
+      
       const selectedChildren = selectedChildrenByNode[n.id] || new Set<string>();
-      const focusedChild = focusedColumn?.nodeId === n.id ? focusedColumn.columnName : undefined;
+      const focusedChild = focusedColumn?.nodeId === n.id ? focusedColumn?.columnName : undefined;
       const isMultiSelected = selectedNodeIds.has(n.id);
       const isPrimarySelected = selectedNodeId === n.id;
       const isSelected = isPrimarySelected || isMultiSelected; // Show selected style for all multi-selected nodes
@@ -1252,13 +1280,11 @@ function LineageCanvasInner() {
           onToggleUpstream: () => {
             // Use the node data as the source of truth for current state
             const isCurrentlyExpanded = upstreamExpanded;
-            console.log('⬆️ Toggle upstream handler', n.id, 'currently expanded:', isCurrentlyExpanded);
             isCurrentlyExpanded ? handleCollapse(n.id, 'up') : handleExpand(n.id, 'up');
           },
           onToggleDownstream: () => {
             // Use the node data as the source of truth for current state
             const isCurrentlyExpanded = downstreamExpanded;
-            console.log('⬇️ Toggle downstream handler', n.id, 'currently expanded:', isCurrentlyExpanded);
             isCurrentlyExpanded ? handleCollapse(n.id, 'down') : handleExpand(n.id, 'down');
           },
           onToggleChildren: () => {
@@ -1408,7 +1434,7 @@ function LineageCanvasInner() {
                   
                   // Add nodes to React Flow with proper positions and children expanded
                   const newNodes = nodesToOpen
-                    .map(nodeId => NODE_BY_ID.get(nodeId))
+                    .map(nodeId => ALL_NODE_BY_ID.get(nodeId))
                     .filter((node): node is LineageNode => Boolean(node))
                     .map(node => {
                       const rfNode = {
@@ -1835,11 +1861,237 @@ function LineageCanvasInner() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [rfNodes, setRfNodes, setSelectedNodeId, setDrawerNode, setSelectedNodeIds]);
 
+  // Handle add node from catalog (click or drop)
+  const handleAddNodeFromCatalog = useCallback(
+    (node: LineageNode, position?: { x: number; y: number }) => {
+      // Check if node is already on the canvas
+      if (visibleNodeIds.has(node.id)) {
+        console.log('Node already on canvas:', node.id);
+        return;
+      }
+
+      // Determine position - use provided position or center
+      let nodePosition;
+      if (position) {
+        nodePosition = position;
+      } else {
+        const viewport = getViewport();
+        nodePosition = {
+          x: (window.innerWidth / 2 - viewport.x) / viewport.zoom,
+          y: (window.innerHeight / 2 - viewport.y) / viewport.zoom,
+        };
+      }
+
+      // Calculate correct expansion state based on visible upstream/downstream nodes
+      const allEdges = [...ALL_EDGES, ...ALL_CATALOG_EDGES];
+      const upstreamNodes = allEdges.filter(e => e.target === node.id).map(e => e.source);
+      const downstreamNodes = allEdges.filter(e => e.source === node.id).map(e => e.target);
+      
+      const upstreamVisible = upstreamNodes.some(id => visibleNodeIds.has(id));
+      const downstreamVisible = downstreamNodes.some(id => visibleNodeIds.has(id));
+
+      // Create the new node
+      const newRfNode = makeRfNode({
+        ...node,
+        upstreamExpanded: upstreamVisible,
+        downstreamExpanded: downstreamVisible,
+      });
+      newRfNode.position = nodePosition;
+
+      // Add to visible nodes
+      setVisibleNodeIds(prev => new Set([...prev, node.id]));
+
+      // Add to ReactFlow
+      setRfNodes(prev => [...prev, newRfNode as any]);
+
+      // Update expansion tracking state if needed
+      if (upstreamVisible) {
+        setExpandedUpstreamByNode(prev => ({
+          ...prev,
+          [node.id]: new Set(upstreamNodes.filter(id => visibleNodeIds.has(id)))
+        }));
+      }
+      if (downstreamVisible) {
+        setExpandedDownstreamByNode(prev => ({
+          ...prev,
+          [node.id]: new Set(downstreamNodes.filter(id => visibleNodeIds.has(id)))
+        }));
+      }
+
+      // Build edges for this new node
+      const newEdges = allEdges
+        .filter(edge =>
+          (edge.source === node.id && visibleNodeIds.has(edge.target)) ||
+          (edge.target === node.id && visibleNodeIds.has(edge.source))
+        )
+        .map(edge => ({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          type: 'custom',
+          sourceHandle: `${edge.source}-main-out`,
+          targetHandle: `${edge.target}-main-in`,
+          data: { relation: edge.relation },
+          animated: true,
+        }));
+
+      if (newEdges.length > 0) {
+        setRfEdges(prev => [...prev, ...newEdges as any]);
+      }
+
+      console.log('Added node from catalog:', node.id, 'at position', nodePosition);
+    },
+    [visibleNodeIds, setVisibleNodeIds, setRfNodes, setRfEdges, getViewport, makeRfNode]
+  );
+
+  // Handle add multiple nodes from schema
+  const handleAddSchemaFromCatalog = useCallback(
+    async (schemaObjects: LineageNode[]) => {
+      // Filter out nodes that are already on the canvas
+      const newNodes = schemaObjects.filter(node => !visibleNodeIds.has(node.id));
+      
+      if (newNodes.length === 0) {
+        console.log('All nodes from schema are already on canvas');
+        return;
+      }
+
+      console.log(`Adding ${newNodes.length} nodes from schema`);
+
+      // Calculate correct expansion state for each node
+      const allEdges = [...ALL_EDGES, ...ALL_CATALOG_EDGES];
+      const allNewNodeIds = new Set(newNodes.map(n => n.id));
+      const allVisibleNodeIds = new Set([...visibleNodeIds, ...allNewNodeIds]);
+
+      // Create ReactFlow nodes with correct expansion state
+      const newRfNodes = newNodes.map(node => {
+        const upstreamNodes = allEdges.filter(e => e.target === node.id).map(e => e.source);
+        const downstreamNodes = allEdges.filter(e => e.source === node.id).map(e => e.target);
+        
+        const upstreamVisible = upstreamNodes.some(id => allVisibleNodeIds.has(id));
+        const downstreamVisible = downstreamNodes.some(id => allVisibleNodeIds.has(id));
+
+        return makeRfNode({
+          ...node,
+          upstreamExpanded: upstreamVisible,
+          downstreamExpanded: downstreamVisible,
+        });
+      });
+
+      // Find edges between the new nodes and existing visible nodes
+      const newEdges = allEdges
+        .filter(edge => {
+          const sourceVisible = visibleNodeIds.has(edge.source) || newNodes.some(n => n.id === edge.source);
+          const targetVisible = visibleNodeIds.has(edge.target) || newNodes.some(n => n.id === edge.target);
+          return sourceVisible && targetVisible;
+        })
+        .map(edge => ({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          type: 'custom',
+          sourceHandle: `${edge.source}-main-out`,
+          targetHandle: `${edge.target}-main-in`,
+          data: { relation: edge.relation },
+          animated: true,
+        }));
+
+      // Add all new nodes to visible set
+      const newVisibleNodeIds = new Set([...visibleNodeIds, ...newNodes.map(n => n.id)]);
+      setVisibleNodeIds(newVisibleNodeIds);
+
+      // Add new nodes to ReactFlow
+      setRfNodes(prev => [...prev, ...newRfNodes as any]);
+
+      // Update expansion tracking state for nodes that have visible upstream/downstream
+      newRfNodes.forEach(rfNode => {
+        const nodeId = rfNode.id;
+        const upstreamNodes = allEdges.filter(e => e.target === nodeId).map(e => e.source);
+        const downstreamNodes = allEdges.filter(e => e.source === nodeId).map(e => e.target);
+        
+        const upstreamVisible = upstreamNodes.some(id => newVisibleNodeIds.has(id));
+        const downstreamVisible = downstreamNodes.some(id => newVisibleNodeIds.has(id));
+
+        if (upstreamVisible) {
+          setExpandedUpstreamByNode(prev => ({
+            ...prev,
+            [nodeId]: new Set(upstreamNodes.filter(id => newVisibleNodeIds.has(id)))
+          }));
+        }
+        if (downstreamVisible) {
+          setExpandedDownstreamByNode(prev => ({
+            ...prev,
+            [nodeId]: new Set(downstreamNodes.filter(id => newVisibleNodeIds.has(id)))
+          }));
+        }
+      });
+
+      // Add new edges to ReactFlow
+      if (newEdges.length > 0) {
+        setRfEdges(prev => [...prev, ...newEdges as any]);
+      }
+
+      // Apply ELK layout to all visible nodes
+      const allVisibleRfNodes = [...rfNodes, ...newRfNodes];
+      const allVisibleEdges = [...rfEdges, ...newEdges];
+      
+      try {
+        const { elkLayout } = await import('./lib/elkLayout');
+        const layoutedNodes = await elkLayout(allVisibleRfNodes, allVisibleEdges, 'RIGHT', false, 1);
+        setRfNodes(layoutedNodes as any);
+      } catch (error) {
+        console.error('Error applying ELK layout:', error);
+      }
+
+      console.log(`Added ${newNodes.length} nodes and ${newEdges.length} edges from schema`);
+    },
+    [visibleNodeIds, setVisibleNodeIds, setRfNodes, setRfEdges, rfNodes, rfEdges, makeRfNode]
+  );
+
+  // Handle drag over from catalog
+  const handleDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  // Handle drop from catalog
+  const handleDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+
+      const nodeDataStr = event.dataTransfer.getData('application/reactflow');
+      if (!nodeDataStr) {
+        console.log('No node data in drop event');
+        return;
+      }
+
+      try {
+        const node: LineageNode = JSON.parse(nodeDataStr);
+        
+        // Get the drop position in flow coordinates
+        const position = screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        });
+
+        console.log('Drop detected at position:', position);
+        handleAddNodeFromCatalog(node, position);
+      } catch (error) {
+        console.error('Error parsing dropped node data:', error);
+      }
+    },
+    [screenToFlowPosition, handleAddNodeFromCatalog]
+  );
+
   return (
     <>
       <div style={{ display: 'flex', height: '100vh', width: '100%' }}>
         {/* Main ReactFlow Container */}
-        <div ref={reactFlowWrapperRef} style={{ flex: 1, position: 'relative' }}>
+        <div 
+          ref={reactFlowWrapperRef} 
+          style={{ flex: 1, position: 'relative' }}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+        >
           <ReactFlow
             nodes={rfNodesWithHandlers as any}
             edges={allEdges as any}
@@ -1906,6 +2158,21 @@ function LineageCanvasInner() {
                 </button>
               </div>
             )}
+
+            {/* Catalog Button - Top Left */}
+            <RFPanel position="top-left">
+              <Button
+                variant="secondary"
+                size="md"
+                level="reactflow"
+                onClick={() => setShowCatalog(true)}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: 6 }}>
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M8.36035 1.00879C12.0588 1.19647 15.0008 4.25493 15.001 8L14.9912 8.36035C14.8035 12.0588 11.7451 15.0008 8 15.001L7.63965 14.9912C3.94127 14.8035 1.00026 11.745 1 8C1.00013 4.13407 4.13407 0.999155 8 0.999023L8.36035 1.00879ZM5.80664 10.75C5.96371 11.4164 6.17313 12.0093 6.41992 12.5029C6.96354 13.5899 7.53888 13.9544 7.9248 13.9961L8 14.001C8.38368 14.0009 9.00093 13.663 9.58105 12.5029C9.82785 12.0093 10.0375 11.4165 10.1943 10.75H5.80664ZM2.66797 10.75C3.35164 12.0729 4.51115 13.1099 5.92188 13.6309C5.42438 12.895 5.02768 11.9023 4.78125 10.75H2.66797ZM11.2188 10.75C10.9725 11.9016 10.5761 12.894 10.0791 13.6299C11.4893 13.1088 12.6484 12.0724 13.332 10.75H11.2188ZM2.22363 6.375C2.07858 6.89177 2.00002 7.43689 2 8C2.00005 8.60882 2.09114 9.19628 2.25977 9.75H4.61035C4.53835 9.19066 4.50002 8.60428 4.5 8C4.50001 7.44071 4.53374 6.89638 4.5957 6.375H2.22363ZM5.60254 6.375C5.53618 6.88953 5.50001 7.43424 5.5 8C5.50002 8.61204 5.543 9.19875 5.62012 9.75H10.3799C10.4569 9.19874 10.5 8.61202 10.5 8C10.5 7.43424 10.4637 6.88952 10.3975 6.375H5.60254ZM11.4043 6.375C11.4663 6.89637 11.5 7.44072 11.5 8C11.5 8.60425 11.4616 9.19066 11.3896 9.75H13.7402C13.9089 9.19625 14.0009 8.60885 14.001 8C14.001 7.43686 13.9215 6.89179 13.7764 6.375H11.4043ZM5.9209 2.36914C4.46603 2.90653 3.27729 3.99232 2.60352 5.375H4.75488C4.9988 4.16971 5.40569 3.13153 5.9209 2.36914ZM8 2C7.61634 2.00007 7.00003 2.33711 6.41992 3.49707C6.15778 4.02144 5.93801 4.65728 5.77832 5.375H10.2227C10.0632 4.65727 9.84319 4.02145 9.58105 3.49707C9.00092 2.33691 8.38369 2.00009 8 2ZM10.0791 2.36914C10.5942 3.1315 11.0002 4.16983 11.2441 5.375H13.3975C12.7236 3.99225 11.5341 2.90659 10.0791 2.36914Z" fill="#5D6A85"/>
+                </svg>
+                Catalog
+              </Button>
+            </RFPanel>
             
             <RFPanel position="top-right">
               {selectedNodeIds.size > 0 ? (
@@ -2301,6 +2568,15 @@ function LineageCanvasInner() {
             </div>
           )}
         </Drawer>
+
+        {/* Catalog Panel */}
+        <CatalogPanel
+          isOpen={showCatalog}
+          onClose={() => setShowCatalog(false)}
+          onAddNode={handleAddNodeFromCatalog}
+          onAddSchema={handleAddSchemaFromCatalog}
+          onDragStart={() => console.log('Drag started from catalog')}
+        />
       </div>
     </>
   );
