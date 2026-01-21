@@ -3,13 +3,13 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactFlow, {
   Background,
   Controls,
-  MiniMap,
   Panel as RFPanel,
   ReactFlowProvider,
   addEdge,
   useEdgesState,
   useNodesState,
   useReactFlow,
+  useUpdateNodeInternals,
   type Connection,
   type Edge,
   type Node,
@@ -23,6 +23,10 @@ import { FilterPopover, type FilterOptions } from './components/FilterPopover';
 import { CatalogPanel } from './components/CatalogPanel';
 import { customEdgeTypes } from './components/CustomEdge';
 import { NodeCard, type NodeCardData } from './components/NodeCard';
+import { GroupNodeCard } from './components/GroupNode';
+import { DocumentationNodeCard } from './components/DocumentationNode';
+import { StickyNoteNodeCard } from './components/StickyNoteNode';
+import { EmptyCardNodeCard } from './components/EmptyCardNode';
 import { GraphProvider, useGraphVisibility } from './context/GraphContext';
 import { useExpand } from './hooks/useLineage';
 import { useHistory, type HistoryState } from './hooks/useHistory';
@@ -37,6 +41,10 @@ import { container } from './styles.stylex';
 type EdgeData = { relation?: string; isColumnEdge?: boolean; isSelected?: boolean };
 const nodeTypes = { 
   lineage: NodeCard,
+  group: GroupNodeCard,
+  documentation: DocumentationNodeCard,
+  stickyNote: StickyNoteNodeCard,
+  emptyCard: EmptyCardNodeCard,
 } as const;
 const edgeTypes = customEdgeTypes;
 
@@ -173,6 +181,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
     setExpandedDownstreamByNode,
   } = useGraphVisibility();
 
+
   // Create combined node lookup that includes both original and catalog nodes
   const ALL_NODE_BY_ID = useMemo(() => {
     const combined = new Map(NODE_BY_ID);
@@ -190,6 +199,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
   const [showZoomTooltip, setShowZoomTooltip] = useState<boolean>(true);
+  const [currentZoom, setCurrentZoom] = useState<number>(1);
 
   // Filter state
   const [filters, setFilters] = useState<FilterOptions>({
@@ -219,475 +229,53 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
     columnName: string;
   } | null>(null);
   const [showAllChildren, setShowAllChildren] = useState<boolean>(false);
+  const [autoLayoutEnabled, setAutoLayoutEnabled] = useState<boolean>(true);
 
-  // Layout management state
-  const [savedLayout, setSavedLayout] = useState<Record<string, { x: number; y: number }> | null>(null);
-  const [defaultLayout, setDefaultLayout] = useState<Record<string, { x: number; y: number }> | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
 
   const { fitView, getViewport, setViewport, screenToFlowPosition } = useReactFlow();
+  const updateNodeInternals = useUpdateNodeInternals();
   const nodesRef = useRef<Node<NodeCardData>[]>([]);
   const edgesRef = useRef<Edge<EdgeData>[]>([]);
 
-  // Comprehensive save/restore functions
-  const saveCurrentState = useCallback(() => {
-    const currentPositions: Record<string, { x: number; y: number }> = {};
-    rfNodes.forEach(node => {
-      currentPositions[node.id] = { x: node.position.x, y: node.position.y };
-    });
-
-    // Get current viewport state
-    const viewport = getViewport();
-    
-    console.log('💾 Saving state (v2):', {
-      visibleNodeIds: Array.from(visibleNodeIds),
-      groupNodes: rfNodes.filter(node => (node.data as any).isGroupNode).map(node => node.id),
-      allRfNodes: rfNodes.map(node => node.id),
-      groupNodesInVisible: Array.from(visibleNodeIds).filter(id => id.includes('-group-')),
-      totalVisibleNodes: visibleNodeIds.size,
-      totalRfNodes: rfNodes.length
-    });
-    
-    // Create comprehensive state object
-    const savedState = {
-      visibleNodeIds: Array.from(visibleNodeIds),
-      nodePositions: currentPositions,
-      expandedUpstream: Object.fromEntries(
-        Object.entries(expandedUpstreamByNode).map(([key, value]) => [key, Array.from(value)])
-      ),
-      expandedDownstream: Object.fromEntries(
-        Object.entries(expandedDownstreamByNode).map(([key, value]) => [key, Array.from(value)])
-      ),
-      groupNodes: rfNodes
-        .filter(node => (node.data as any).isGroupNode)
-        .map(node => ({
-          id: node.id,
-          position: node.position,
-          groupedNodes: (node.data as any).groupedNodes?.map((n: any) => n.id) || []
-        })),
-      viewport: {
-        x: viewport.x,
-        y: viewport.y,
-        zoom: viewport.zoom
-      },
-      timestamp: Date.now()
-    };
-
-    setSavedLayout(currentPositions);
-    
-    // Persist to localStorage
-    try {
-      localStorage.setItem('lineage-saved-state', JSON.stringify(savedState));
-      console.log('💾 Complete state saved to localStorage:', {
-        nodes: Object.keys(currentPositions).length,
-        visibleNodes: savedState.visibleNodeIds.length,
-        viewport: savedState.viewport
-      });
-    } catch (error) {
-      console.error('Failed to save state to localStorage:', error);
-    }
-  }, [rfNodes, visibleNodeIds, expandedUpstreamByNode, expandedDownstreamByNode, getViewport]);
-
-  const restoreSavedState = useCallback(() => {
-    try {
-      const savedStateData = localStorage.getItem('lineage-saved-state');
-      if (!savedStateData) {
-        console.log('⚠️ No saved state to restore');
-        return;
-      }
-
-      const savedState = JSON.parse(savedStateData);
-      console.log('📂 Restoring saved state:', {
-        visibleNodes: savedState.visibleNodeIds?.length || 0,
-        nodePositions: Object.keys(savedState.nodePositions || {}).length,
-        timestamp: new Date(savedState.timestamp).toLocaleString()
-      });
-
-      // Restore visible nodes
-      if (savedState.visibleNodeIds) {
-        setVisibleNodeIds(new Set(savedState.visibleNodeIds));
-      }
-
-      // Restore expansion states
-      if (savedState.expandedUpstream) {
-        const restoredUpstream: Record<string, Set<string>> = {};
-        Object.entries(savedState.expandedUpstream).forEach(([key, value]) => {
-          restoredUpstream[key] = new Set(value as string[]);
-        });
-        setExpandedUpstreamByNode(restoredUpstream);
-      }
-
-      if (savedState.expandedDownstream) {
-        const restoredDownstream: Record<string, Set<string>> = {};
-        Object.entries(savedState.expandedDownstream).forEach(([key, value]) => {
-          restoredDownstream[key] = new Set(value as string[]);
-        });
-        setExpandedDownstreamByNode(restoredDownstream);
-      }
-
-      // Create nodes for all visible nodes
-      const restoredNodes = savedState.visibleNodeIds.map((nodeId: string) => {
-        const baseNode = ALL_NODE_BY_ID.get(nodeId);
-        if (!baseNode) return null;
-
-        const rfNode = makeRfNode({
-          ...baseNode,
-          upstreamExpanded: savedState.expandedUpstream?.[nodeId]?.length > 0 || false,
-          downstreamExpanded: savedState.expandedDownstream?.[nodeId]?.length > 0 || false,
-        });
-
-        // Restore position if available
-        if (savedState.nodePositions?.[nodeId]) {
-          rfNode.position = savedState.nodePositions[nodeId];
-        }
-
-        return rfNode;
-      }).filter(Boolean);
-
-      setRfNodes(restoredNodes as any);
-
-      // Recreate group nodes if they exist in saved state
-      if (savedState.groupNodes && savedState.groupNodes.length > 0) {
-        console.log('🔄 Recreating group nodes:', savedState.groupNodes.length);
-        
-        const groupNodesToAdd: Node<NodeCardData>[] = [];
-        
-        savedState.groupNodes.forEach((groupNodeData: any) => {
-          const groupedNodes = groupNodeData.groupedNodes.map((id: string) => ALL_NODE_BY_ID.get(id)).filter(Boolean);
-          
-          if (groupedNodes.length > 0) {
-            const groupNode: Node<NodeCardData> = {
-              id: groupNodeData.id,
-              type: 'lineage',
-              data: {
-                id: groupNodeData.id,
-                name: groupNodeData.id,
-                label: `+${groupedNodes.length} more`,
-                objType: 'DATASET',
-                upstreamExpanded: false,
-                downstreamExpanded: false,
-                isGroupNode: true,
-                groupedNodes: groupedNodes,
-                onPromoteNode: (promotedNodeId: string) => {
-                  console.log('🚀 PROMOTION STARTED for:', promotedNodeId);
-                  console.log('🎯 Promoting node from group (restore):', promotedNodeId);
-                  
-                  // Add to visible nodes first
-                  const updatedVisible = new Set(visibleNodeIds);
-                  updatedVisible.add(promotedNodeId);
-                  setVisibleNodeIds(updatedVisible);
-                  
-                  // Create a new node for the promoted item
-                  const promotedNode = ALL_NODE_BY_ID.get(promotedNodeId);
-                  console.log('🔍 Promoted node found:', promotedNode);
-                  
-                  if (promotedNode) {
-                    // Find the parent node by looking at the original edge data
-                    // Look for edges where the promoted node is the target
-                    const allEdges = [...ALL_EDGES, ...ALL_CATALOG_EDGES];
-                    console.log('🔍 All edges count:', allEdges.length);
-                    
-                    const parentEdge = allEdges.find(edge => 
-                      edge.target === promotedNodeId
-                    );
-                    
-                    console.log('🔍 Parent edge found:', parentEdge);
-                    
-                    // Find the parent node in the current graph
-                    const parentNode = parentEdge ? rfNodes.find(node => node.id === parentEdge.source) : null;
-                    
-                    console.log('🔍 Parent node found:', parentNode?.id);
-                    
-                    // Special check for TEST.CORE.USER_BASE
-                    const userBaseNode = rfNodes.find(node => node.id === 'TEST.CORE.USER_BASE');
-                    console.log('🔍 TEST.CORE.USER_BASE found:', userBaseNode?.id);
-                    
-                    if (parentNode) {
-                      // Calculate position relative to parent
-                      const parentPos = parentNode.position;
-                      const offsetX = 200; // Distance from parent
-                      const offsetY = 100; // Vertical offset
-                      
-                      const newNode: Node<NodeCardData> = {
-                        id: promotedNodeId,
-                        type: 'lineage',
-                        data: {
-                          id: promotedNodeId,
-                          name: promotedNode.name,
-                          label: promotedNode.label,
-                          objType: promotedNode.objType,
-                          upstreamExpanded: false,
-                          downstreamExpanded: false,
-                          children: promotedNode.children, // Include the children data for columns/features
-                          columnsMetadata: promotedNode.columnsMetadata, // Include detailed column metadata
-                          dataQualityScore: promotedNode.dataQualityScore, // Include quality score
-                          onPromoteNode: (id: string) => {
-                            console.log('🎯 Promoting node from group:', id);
-                            // This will be handled by the existing promotion logic
-                          }
-                        },
-                        position: { 
-                          x: parentPos.x + offsetX, 
-                          y: parentPos.y + offsetY 
-                        }
-                      };
-                      
-                      // Create edge from parent to promoted node
-                      const newEdge: Edge = {
-                        id: `${parentNode.id}-${promotedNodeId}`,
-                        source: parentNode.id,
-                        target: promotedNodeId,
-                        type: 'custom',
-                        data: {
-                          sourceColumn: '',
-                          targetColumn: '',
-                          relationshipType: 'direct'
-                        }
-                      };
-                      
-                      setRfNodes(prev => {
-                        // Add the new promoted node
-                        const newNodes = [...prev, newNode];
-                        
-                        // Update the group node to remove the promoted node
-                        const updatedNodes = newNodes.map(node => {
-                          if ((node.data as any).isGroupNode && (node.data as any).groupedNodes) {
-                            const updatedGroupedNodes = (node.data as any).groupedNodes.filter((n: any) => n.id !== promotedNodeId);
-                            
-                            // If group becomes empty, remove it entirely
-                            if (updatedGroupedNodes.length === 0) {
-                              return null; // Will be filtered out
-                            }
-                            
-                            // Update the group node with remaining nodes
-                            return {
-                              ...node,
-                              data: {
-                                ...node.data,
-                                groupedNodes: updatedGroupedNodes,
-                                label: `+${updatedGroupedNodes.length} more`
-                              }
-                            };
-                          }
-                          return node;
-                        });
-                        
-                        // Filter out null entries (empty groups) and return properly typed array
-                        return updatedNodes.filter((node): node is Node<NodeCardData> => node !== null);
-                      });
-                      
-                      // Add the new edge
-                      setRfEdges(prev => [...prev, newEdge]);
-                    } else {
-                      console.warn('Could not find parent node for promoted node:', promotedNodeId);
-                      console.log('🔍 Available nodes in graph:', rfNodes.map(n => n.id));
-                      console.log('🔍 Parent edge source:', parentEdge?.source);
-                      
-                      // Try to use TEST.CORE.USER_BASE as fallback parent
-                      const fallbackParent = userBaseNode || null;
-                      console.log('🔍 Using fallback parent:', fallbackParent?.id);
-                      
-                      if (fallbackParent) {
-                        // Use the fallback parent for positioning and connection
-                        const parentPos = fallbackParent.position;
-                        const offsetX = 200;
-                        const offsetY = 100;
-                        
-                        const newNode: Node<NodeCardData> = {
-                          id: promotedNodeId,
-                          type: 'lineage',
-                          data: {
-                            id: promotedNodeId,
-                            name: promotedNode.name,
-                            label: promotedNode.label,
-                            objType: promotedNode.objType,
-                            upstreamExpanded: false,
-                            downstreamExpanded: false,
-                            children: promotedNode.children,
-                            columnsMetadata: promotedNode.columnsMetadata,
-                            dataQualityScore: promotedNode.dataQualityScore,
-                            onPromoteNode: (id: string) => {
-                              console.log('🎯 Promoting node from group:', id);
-                            }
-                          },
-                          position: { 
-                            x: parentPos.x + offsetX, 
-                            y: parentPos.y + offsetY 
-                          }
-                        };
-                        
-                        // Create edge from fallback parent to promoted node
-                        const newEdge: Edge = {
-                          id: `${fallbackParent.id}-${promotedNodeId}`,
-                          source: fallbackParent.id,
-                          target: promotedNodeId,
-                          type: 'custom',
-                          data: {
-                            sourceColumn: '',
-                            targetColumn: '',
-                            relationshipType: 'direct'
-                          }
-                        };
-                        
-                        setRfNodes(prev => {
-                          const newNodes = [...prev, newNode];
-                          
-                          const updatedNodes = newNodes.map(node => {
-                            if ((node.data as any).isGroupNode && (node.data as any).groupedNodes) {
-                              const updatedGroupedNodes = (node.data as any).groupedNodes.filter((n: any) => n.id !== promotedNodeId);
-                              
-                              if (updatedGroupedNodes.length === 0) {
-                                return null;
-                              }
-                              
-                              return {
-                                ...node,
-                                data: {
-                                  ...node.data,
-                                  groupedNodes: updatedGroupedNodes,
-                                  label: `+${updatedGroupedNodes.length} more`
-                                }
-                              };
-                            }
-                            return node;
-                          });
-                          
-                          return updatedNodes.filter((node): node is Node<NodeCardData> => node !== null);
-                        });
-                        
-                        setRfEdges(prev => [...prev, newEdge]);
-                      } else {
-                        // Final fallback: create the promoted node without connection
-                        const newNode: Node<NodeCardData> = {
-                          id: promotedNodeId,
-                          type: 'lineage',
-                          data: {
-                            id: promotedNodeId,
-                            name: promotedNode.name,
-                            label: promotedNode.label,
-                            objType: promotedNode.objType,
-                            upstreamExpanded: false,
-                            downstreamExpanded: false,
-                            children: promotedNode.children,
-                            columnsMetadata: promotedNode.columnsMetadata,
-                            dataQualityScore: promotedNode.dataQualityScore,
-                            onPromoteNode: (id: string) => {
-                              console.log('🎯 Promoting node from group:', id);
-                            }
-                          },
-                          position: { x: Math.random() * 400 + 100, y: Math.random() * 300 + 100 }
-                        };
-                        
-                        setRfNodes(prev => {
-                          const newNodes = [...prev, newNode];
-                          
-                          const updatedNodes = newNodes.map(node => {
-                            if ((node.data as any).isGroupNode && (node.data as any).groupedNodes) {
-                              const updatedGroupedNodes = (node.data as any).groupedNodes.filter((n: any) => n.id !== promotedNodeId);
-                              
-                              if (updatedGroupedNodes.length === 0) {
-                                return null;
-                              }
-                              
-                              return {
-                                ...node,
-                                data: {
-                                  ...node.data,
-                                  groupedNodes: updatedGroupedNodes,
-                                  label: `+${updatedGroupedNodes.length} more`
-                                }
-                              };
-                            }
-                            return node;
-                          });
-                          
-                          return updatedNodes.filter((node): node is Node<NodeCardData> => node !== null);
-                        });
-                      }
-                    }
-                  }
-                }
-              },
-              position: groupNodeData.position
-            };
-            
-            groupNodesToAdd.push(groupNode);
-          }
-        });
-        
-        // Add group nodes to the existing nodes
-        if (groupNodesToAdd.length > 0) {
-          setRfNodes(prev => [...prev, ...groupNodesToAdd]);
-        }
-      }
-
-      // Build edges for visible nodes (including group nodes)
-      const idSet = new Set(savedState.visibleNodeIds);
-      // Add group node IDs to the set for edge building
-      if (savedState.groupNodes) {
-        savedState.groupNodes.forEach((groupNode: any) => {
-          idSet.add(groupNode.id);
-        });
-      }
-      
-      console.log('🔄 Restoring edges (v2):', {
-        visibleNodeIds: Array.from(savedState.visibleNodeIds),
-        groupNodes: savedState.groupNodes?.map((g: any) => g.id) || [],
-        idSet: Array.from(idSet),
-        groupNodesInIdSet: Array.from(idSet).filter((id: unknown) => typeof id === 'string' && id.includes('-group-'))
-      });
-      
-      // Use the buildRfEdges function which handles group node edges properly
-      const edges = buildRfEdges(idSet as Set<string>);
-      setRfEdges(edges as any);
-
-      // Restore viewport after a delay
-      if (savedState.viewport) {
-        setTimeout(() => {
-          setViewport(savedState.viewport);
-          console.log('🔄 Viewport restored:', savedState.viewport);
-        }, 100);
-      }
-
-      console.log('🔄 Complete state restored successfully');
-    } catch (error) {
-      console.error('Failed to restore saved state:', error);
-    }
-  }, [setVisibleNodeIds, setExpandedUpstreamByNode, setExpandedDownstreamByNode, setRfNodes, setRfEdges, setViewport, makeRfNode]);
-
-  const resetToDefaultLayout = useCallback(() => {
-    if (!defaultLayout) {
-      console.log('⚠️ No default layout available');
-      return;
-    }
-    
-    // Clear saved state first to prevent it from being restored
-    setSavedLayout(null);
-    try {
-      localStorage.removeItem('lineage-saved-state');
-      console.log('🗑️ Saved state cleared before reset');
-    } catch (error) {
-      console.error('Failed to clear saved state:', error);
-    }
-    
-    setRfNodes(prev => prev.map(node => ({
-      ...node,
-      position: defaultLayout[node.id] || node.position
-    })));
-    console.log('🔄 Layout reset to default:', Object.keys(defaultLayout).length, 'nodes');
-  }, [defaultLayout, setRfNodes]);
-
-  const clearSavedState = useCallback(() => {
-    setSavedLayout(null);
-    try {
-      localStorage.removeItem('lineage-saved-state');
-      console.log('🗑️ Saved state cleared from localStorage');
-    } catch (error) {
-      console.error('Failed to clear saved state from localStorage:', error);
-    }
+  // Group node management functions
+  const handleGroupResize = useCallback((nodeId: string, width: number, height: number) => {
+    setRfNodes((nds) => 
+      nds.map((node) => 
+        node.id === nodeId 
+          ? { ...node, width, height, data: { ...node.data, width, height } }
+          : node
+      )
+    );
   }, []);
+
+  const handleGroupToggleCollapse = useCallback((nodeId: string) => {
+    setRfNodes((nds) => 
+      nds.map((node) => 
+        node.id === nodeId 
+          ? { ...node, data: { ...node.data, isCollapsed: !(node.data as any).isCollapsed } }
+          : node
+      )
+    );
+  }, []);
+
+  const handleRemoveGroup = useCallback((nodeId: string) => {
+    setRfNodes((nds) => nds.filter((node) => node.id !== nodeId));
+    setSelectedNodeIds((prev) => {
+      const next = new Set(prev);
+      next.delete(nodeId);
+      return next;
+    });
+  }, []);
+
   useEffect(() => void (nodesRef.current = rfNodes), [rfNodes]);
   useEffect(() => void (edgesRef.current = rfEdges), [rfEdges]);
+  
+  // Refs for column lineage state (used in applyAutoLayout)
+  const selectedColumnLineageRef = useRef(selectedColumnLineage);
+  const hoveredColumnLineageRef = useRef(hoveredColumnLineage);
+  useEffect(() => void (selectedColumnLineageRef.current = selectedColumnLineage), [selectedColumnLineage]);
+  useEffect(() => void (hoveredColumnLineageRef.current = hoveredColumnLineage), [hoveredColumnLineage]);
 
   // Undo/Redo history
   const { canUndo, canRedo, undo, redo, pushState, getCurrentState } = useHistory();
@@ -741,12 +329,15 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
     }, 300);
   }, [setVisibleNodeIds, setExpandedUpstreamByNode, setExpandedDownstreamByNode, setRfNodes, setViewport]);
 
-  // Custom nodes change handler to support group dragging
+  // Custom nodes change handler to support group dragging and dimension changes
   const handleNodesChange = useCallback((changes: any[]) => {
     // Check if drag just ended (position change with dragging: false)
     const dragEndChanges = changes.filter(change => 
       change.type === 'position' && change.dragging === false
     );
+    
+    // Check for dimension changes (node resize due to content change)
+    const dimensionChanges = changes.filter(change => change.type === 'dimensions');
     
     // Handle group dragging for multi-selected nodes
     const dragChanges = changes.filter(change => change.type === 'position' && change.dragging);
@@ -799,6 +390,12 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
       setTimeout(() => {
         pushState(captureState());
       }, 100);
+    }
+    
+    // Trigger auto-layout when node dimensions change (e.g., column expand/collapse)
+    if (dimensionChanges.length > 0 && autoLayoutEnabledRef.current) {
+      // Debounce to avoid too many layout calls during rapid dimension changes
+      applyAutoLayoutRef.current();
     }
   }, [onNodesChange, selectedNodeIds, rfNodes, captureState, pushState]);
 
@@ -1131,8 +728,8 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
     if (currentNodes.length === 0) return;
     
     try {
-      // Apply ELK layout to reorganize current visible nodes with normal horizontal spacing but increased vertical spacing
-      const laidOutNodes = await elkLayout(currentNodes as any, currentEdges as any, 'RIGHT', false, 3); // Use normal spacing but 3x vertical gap
+      // Apply ELK layout to reorganize current visible nodes
+      const laidOutNodes = await elkLayout(currentNodes as any, currentEdges as any, 'RIGHT');
       
       // Update positions of the laid out nodes while preserving other node data
       setRfNodes(prevNodes => 
@@ -1142,11 +739,181 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
         })
       );
       
-      // Don't change zoom level - just reorganize at current zoom
+      // Pan to center nodes without changing zoom (keep at 100%)
+      setTimeout(() => fitView({ padding: 0.15, duration: 300, minZoom: 1, maxZoom: 1 }), 100);
     } catch (error) {
       console.error('Failed to tidy up nodes:', error);
     }
-  }, [rfNodes, rfEdges, visibleNodeIds, setRfNodes]);
+  }, [rfNodes, rfEdges, visibleNodeIds, setRfNodes, fitView]);
+
+  // Auto-layout refs for debouncing
+  const autoLayoutTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoLayoutEnabledRef = useRef(true);
+  const applyAutoLayoutRef = useRef<() => void>(() => {});
+  const skipAutoLayoutRef = useRef(false); // Skip auto-layout when predictive layout was just applied
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    autoLayoutEnabledRef.current = autoLayoutEnabled;
+  }, [autoLayoutEnabled]);
+
+  // Ref to prevent re-triggering during layout
+  const isLayoutInProgressRef = useRef(false);
+  
+  // Auto-layout function - applies ELK layout when enabled
+  const applyAutoLayout = useCallback(async () => {
+    // Prevent re-entry during layout
+    if (isLayoutInProgressRef.current) {
+      return;
+    }
+    
+    // Clear any pending timeout
+    if (autoLayoutTimeoutRef.current) {
+      clearTimeout(autoLayoutTimeoutRef.current);
+    }
+    
+    // Short debounce to batch rapid changes
+    autoLayoutTimeoutRef.current = setTimeout(async () => {
+      if (!autoLayoutEnabledRef.current || isLayoutInProgressRef.current) {
+        return;
+      }
+      
+      isLayoutInProgressRef.current = true;
+      
+      // Get current nodes with measured dimensions from DOM
+      const currentNodes = nodesRef.current.filter(node => 
+        visibleNodeIds.has(node.id) || (node.data as any).isGroupNode
+      );
+      
+      // Get base edges
+      const baseEdges = edgesRef.current.filter(edge => 
+        (visibleNodeIds.has(edge.source) || edge.source.includes('-group-')) && 
+        (visibleNodeIds.has(edge.target) || edge.target.includes('-group-'))
+      );
+      
+      // Include column lineage edges for layout (so ELK knows about node relationships)
+      const columnLineageEdges = createColumnLineageEdges(
+        selectedColumnLineageRef.current, 
+        hoveredColumnLineageRef.current
+      ).filter(edge => 
+        visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
+      );
+      
+      // Combine and deduplicate edges by source-target pair (ELK only needs node relationships)
+      const edgePairs = new Set(baseEdges.map(e => `${e.source}->${e.target}`));
+      const uniqueColumnEdges = columnLineageEdges.filter(e => !edgePairs.has(`${e.source}->${e.target}`));
+      const currentEdges = [...baseEdges, ...uniqueColumnEdges];
+      
+      if (currentNodes.length === 0) {
+        isLayoutInProgressRef.current = false;
+        return;
+      }
+      
+      // Calculate node dimensions for layout
+      const nodesWithDimensions = currentNodes.map(node => {
+        const hasExpandedColumns = (node.data as any)?.childrenExpanded === true;
+        
+        // Use fixed heights: 378px for expanded (max height), 160px for collapsed
+        const height = hasExpandedColumns ? 378 : 160;
+        const width = 280; // Standard card width
+        
+        return {
+          ...node,
+          width,
+          height,
+        };
+      });
+      
+      try {
+        const laidOutNodes = await elkLayout(nodesWithDimensions as any, currentEdges as any, 'RIGHT');
+        
+        setRfNodes(prevNodes => 
+          prevNodes.map(node => {
+            const laidOutNode = laidOutNodes.find(ln => ln.id === node.id);
+            return laidOutNode ? { ...node, position: laidOutNode.position } : node;
+          })
+        );
+        
+        // Center all nodes in viewport after layout (no animation to avoid triggering more changes)
+        setTimeout(() => {
+          fitView({ padding: 0.15, duration: 0, maxZoom: 1 });
+          isLayoutInProgressRef.current = false;
+        }, 50);
+      } catch (error) {
+        console.error('Auto-layout failed:', error);
+        isLayoutInProgressRef.current = false;
+      }
+    }, 100); // Short delay to batch changes
+  }, [visibleNodeIds, setRfNodes, fitView]);
+
+  // Keep ref in sync with the latest applyAutoLayout function
+  useEffect(() => {
+    applyAutoLayoutRef.current = applyAutoLayout;
+  }, [applyAutoLayout]);
+
+  // Predictive layout: calculate layout BEFORE visual change, then apply both together
+  const applyPredictiveLayout = useCallback(async (
+    nodeId: string, 
+    changes: { childrenExpanded?: boolean }
+  ) => {
+    if (!autoLayoutEnabledRef.current) return null;
+    
+    // Get current nodes and predict their new dimensions
+    const currentNodes = nodesRef.current.filter(node => 
+      visibleNodeIds.has(node.id) || (node.data as any).isGroupNode
+    );
+    const currentEdges = edgesRef.current.filter(edge => 
+      (visibleNodeIds.has(edge.source) || edge.source.includes('-group-')) && 
+      (visibleNodeIds.has(edge.target) || edge.target.includes('-group-'))
+    );
+    
+    if (currentNodes.length === 0) return null;
+    
+    // Calculate predicted dimensions for all nodes
+    const nodesWithPredictedDimensions = currentNodes.map(node => {
+      // For the node being changed, use the NEW state
+      const willBeExpanded = node.id === nodeId 
+        ? changes.childrenExpanded ?? (node.data as any)?.childrenExpanded
+        : (node.data as any)?.childrenExpanded === true;
+      
+      const childrenCount = Math.min((node.data as any)?.children?.length || 0, 8);
+      // Predict height: base 160px + ~36px per visible column row + header/search
+      const predictedHeight = willBeExpanded ? 200 + (childrenCount * 36) : 160;
+      
+      return {
+        ...node,
+        width: 420, // Standard width
+        height: predictedHeight,
+      };
+    });
+    
+    try {
+      const laidOutNodes = await elkLayout(
+        nodesWithPredictedDimensions as any, 
+        currentEdges as any, 
+        'RIGHT'
+      );
+      
+      // Return the new positions so caller can apply them with the state change
+      return new Map(laidOutNodes.map(n => [n.id, n.position]));
+    } catch (error) {
+      console.error('Predictive layout failed:', error);
+      return null;
+    }
+  }, [visibleNodeIds]);
+
+  // Ref for predictive layout
+  const applyPredictiveLayoutRef = useRef(applyPredictiveLayout);
+  useEffect(() => {
+    applyPredictiveLayoutRef.current = applyPredictiveLayout;
+  }, [applyPredictiveLayout]);
+
+  // Trigger auto-layout when relevant state changes
+  useEffect(() => {
+    if (autoLayoutEnabled && rfNodes.length > 0) {
+      applyAutoLayout();
+    }
+  }, [autoLayoutEnabled, visibleNodeIds, rfNodes.length, applyAutoLayout]);
 
   // Commented out - not currently used, but kept for future reference
   // const initializeAllNodes = useCallback(async () => {
@@ -1223,6 +990,9 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
     const newShowAllChildren = !showAllChildren;
     setShowAllChildren(newShowAllChildren);
     
+    // Skip dimension-triggered auto-layout since we'll call it explicitly
+    skipAutoLayoutRef.current = true;
+    
     // Update all nodes to show/hide children
     setRfNodes(prev => prev.map(node => ({
       ...node,
@@ -1232,12 +1002,12 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
       }
     })));
     
-    // Force ReactFlow to recalculate node dimensions after a brief delay
+    // Trigger auto-layout after DOM has updated
     setTimeout(() => {
-      const currentViewport = getViewport();
-      setViewport({ ...currentViewport });
+      skipAutoLayoutRef.current = false; // Re-enable for future changes
+      applyAutoLayout();
     }, 100);
-  }, [showAllChildren, setRfNodes, getViewport, setViewport]);
+  }, [showAllChildren, setRfNodes, applyAutoLayout]);
 
   // Commented out - using resetGraph instead for custom initial state
   // useEffect(() => {
@@ -1727,14 +1497,14 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
   const resetGraph = useCallback(() => {
     console.log('🔄 resetGraph called');
     
-    // Show only FCT_ORDERS and USER_BASE initially
-    const initialNodeIds = ['DW.PUBLIC.FCT_ORDERS', 'TEST.CORE.USER_BASE'];
+    // Show only FCT_ORDERS initially
+    const initialNodeIds = ['DW.PUBLIC.FCT_ORDERS'];
     setVisibleNodeIds(new Set(initialNodeIds));
     setExpandedUpstreamByNode({});
     setExpandedDownstreamByNode({});
     setShowAllChildren(false);
     
-    // Create both nodes
+    // Create initial nodes
     const nodes = initialNodeIds.map((id, index) => {
       const node = ALL_NODE_BY_ID.get(id);
       if (!node) return null;
@@ -1747,17 +1517,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
     setRfNodes(nodes as any);
     setRfEdges([] as any);
     
-    // Capture default layout positions
-    const defaultPositions: Record<string, { x: number; y: number }> = {};
-    nodes.forEach(node => {
-      if (node) {
-        defaultPositions[node.id] = { x: node.position.x, y: node.position.y };
-      }
-    });
-    setDefaultLayout(defaultPositions);
-    console.log('💾 Default layout captured:', Object.keys(defaultPositions).length, 'nodes');
-    
-    setTimeout(() => fitView({ padding: 0.2 }), 0);
+    setTimeout(() => fitView({ padding: 0.2, minZoom: 1, maxZoom: 1 }), 0);
   }, [
     setVisibleNodeIds,
     setExpandedUpstreamByNode,
@@ -1766,30 +1526,11 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
     setRfEdges,
     fitView,
     ALL_NODE_BY_ID,
-    restoreSavedState,
   ]);
 
   // Initialize on mount
   useEffect(() => {
-    console.log('🎬 Component mounted, checking for saved state');
-    
-    // Check if there's a saved state first
-    try {
-      const savedStateData = localStorage.getItem('lineage-saved-state');
-      if (savedStateData) {
-        console.log('📂 Found saved state, restoring...');
-        // Restore comprehensive state
-        setTimeout(() => {
-          restoreSavedState();
-        }, 100);
-      } else {
-        console.log('🔄 No saved state found, calling resetGraph');
-        resetGraph();
-      }
-    } catch (error) {
-      console.error('Failed to check saved state on mount:', error);
-      resetGraph();
-    }
+    resetGraph();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount
 
@@ -1834,14 +1575,36 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
             console.log('🔗 onToggleDownstream: Current state for', n.id, ':', expansionState);
             isCurrentlyExpanded ? handleCollapse(n.id, 'down') : handleExpand(n.id, 'down');
           },
-          onToggleChildren: () => {
+          onToggleChildren: async () => {
             // Toggle children expansion state
             const newChildrenExpanded = !n.data.childrenExpanded;
-            setRfNodes(prev => prev.map(node => 
-              node.id === n.id 
-                ? { ...node, data: { ...node.data, childrenExpanded: newChildrenExpanded } }
-                : node
-            ));
+            
+            // Update the ref synchronously BEFORE setRfNodes so layout can use it
+            nodesRef.current = nodesRef.current.map(node => {
+              if (node.id === n.id) {
+                return { 
+                  ...node, 
+                  data: { ...node.data, childrenExpanded: newChildrenExpanded }
+                };
+              }
+              return node;
+            });
+            
+            // Then update state
+            setRfNodes(prev => prev.map(node => {
+              if (node.id === n.id) {
+                return { 
+                  ...node, 
+                  data: { ...node.data, childrenExpanded: newChildrenExpanded }
+                };
+              }
+              return node;
+            }));
+            
+            // Explicitly trigger auto-layout after state update
+            setTimeout(() => {
+              applyAutoLayout();
+            }, 50);
             
             // Update global state based on whether all nodes now have children expanded
             const allNodesExpanded = rfNodes.every(node => 
@@ -1857,12 +1620,6 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
             } else if (!anyNodeExpanded) {
               setShowAllChildren(false);
             }
-            
-            // Force ReactFlow to recalculate node dimensions after a brief delay
-            setTimeout(() => {
-              const currentViewport = getViewport();
-              setViewport({ ...currentViewport });
-            }, 100);
           },
           onClearColumnLineage: () => {
             // Clear column lineage selection when scrolling
@@ -1898,6 +1655,8 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
               if (isCurrentlySelected) {
                 // Deselect the child - clear column lineage
                 setSelectedColumnLineage(null);
+                setFocusedColumn(null); // Clear focused column to unpin it
+                setDrawerNode(null); // Close drawer
                 const newSelected = new Set(currentSelected);
                 newSelected.delete(childName);
                 return {
@@ -1910,6 +1669,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
                 // 2. Auto-select related columns in those nodes  
                 // 3. Auto-select column edges
                 setSelectedNodeId(null); // Clear selected node
+                setSelectedNodeIds(new Set()); // Clear multi-selection
                 setDrawerNode(null); // Close drawer
                 setSelectedColumnLineage({ nodeId: n.id, columnName: childName });
                 
@@ -2044,7 +1804,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
         },
       };
     });
-  }, [rfNodes, expandedUpstreamByNode, expandedDownstreamByNode, selectedNodeId, selectedNodeIds, selectedChildrenByNode, focusedColumn, handleExpand, handleCollapse, visibleNodeIds, setVisibleNodeIds, setRfNodes, setRfEdges, positionRelatedNodes, setSelectedColumnLineage, setSelectedChildrenByNode]);
+  }, [rfNodes, expandedUpstreamByNode, expandedDownstreamByNode, selectedNodeId, selectedNodeIds, selectedChildrenByNode, focusedColumn, handleExpand, handleCollapse, visibleNodeIds, setVisibleNodeIds, setRfNodes, setRfEdges, positionRelatedNodes, setSelectedColumnLineage, setSelectedChildrenByNode, applyAutoLayout, fitView]);
 
   // Add column lineage edges to the regular edges
   const allEdges = useMemo(() => {
@@ -2054,16 +1814,22 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
 
   // Force ReactFlow to recalculate edge positions when column lineage changes
   useEffect(() => {
-    if (selectedColumnLineage) {
+    if (focusedColumn || selectedColumnLineage) {
       // Small delay to ensure handles are rendered before edges are calculated
       const timer = setTimeout(() => {
-        // Trigger a viewport update to recalculate edge positions
+        // Update internals for all nodes with expanded children to recalculate handle positions
+        rfNodes.forEach(node => {
+          if (node.data.childrenExpanded) {
+            updateNodeInternals(node.id);
+          }
+        });
+        // Also trigger a viewport update to recalculate edge positions
         const currentViewport = getViewport();
         setViewport({ ...currentViewport });
-      }, 100);
+      }, 150);
       return () => clearTimeout(timer);
     }
-  }, [selectedColumnLineage, getViewport, setViewport]);
+  }, [focusedColumn, selectedColumnLineage, rfNodes, updateNodeInternals, getViewport, setViewport]);
 
   const onNodeClick: NodeMouseHandler = useCallback((event, node) => {
     setDrawerEdge(null);
@@ -2201,6 +1967,9 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
   const handleShowAllColumnsForSelected = useCallback(() => {
     const selectedNodes = Array.from(selectedNodeIds);
     
+    // Skip dimension-triggered auto-layout since we'll call it explicitly
+    skipAutoLayoutRef.current = true;
+    
     // Toggle childrenExpanded for selected nodes
     setRfNodes(prevNodes => 
       prevNodes.map(node => {
@@ -2216,10 +1985,19 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
         return node;
       })
     );
-  }, [selectedNodeIds, setRfNodes]);
+    
+    // Trigger auto-layout after DOM updates
+    setTimeout(() => {
+      skipAutoLayoutRef.current = false;
+      applyAutoLayout();
+    }, 100);
+  }, [selectedNodeIds, setRfNodes, applyAutoLayout]);
 
   const handleHideAllColumnsForSelected = useCallback(() => {
     const selectedNodes = Array.from(selectedNodeIds);
+    
+    // Skip dimension-triggered auto-layout since we'll call it explicitly
+    skipAutoLayoutRef.current = true;
     
     // Toggle childrenExpanded for selected nodes
     setRfNodes(prevNodes => 
@@ -2236,7 +2014,13 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
         return node;
       })
     );
-  }, [selectedNodeIds, setRfNodes]);
+    
+    // Trigger auto-layout after DOM updates
+    setTimeout(() => {
+      skipAutoLayoutRef.current = false;
+      applyAutoLayout();
+    }, 100);
+  }, [selectedNodeIds, setRfNodes, applyAutoLayout]);
 
   const handleGroupNodes = useCallback(() => {
     // TODO: Implement node grouping functionality
@@ -2617,15 +2401,17 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
       
       try {
         const { elkLayout } = await import('./lib/elkLayout');
-        const layoutedNodes = await elkLayout(allVisibleRfNodes, allVisibleEdges, 'RIGHT', false, 1);
+        const layoutedNodes = await elkLayout(allVisibleRfNodes, allVisibleEdges, 'RIGHT');
         setRfNodes(layoutedNodes as any);
+        // Pan to center nodes without changing zoom (keep at 100%)
+        setTimeout(() => fitView({ padding: 0.15, duration: 300, minZoom: 1, maxZoom: 1 }), 150);
       } catch (error) {
         console.error('Error applying ELK layout:', error);
       }
 
       console.log(`Added ${newNodes.length} nodes and ${newEdges.length} edges from schema`);
     },
-    [visibleNodeIds, setVisibleNodeIds, setRfNodes, setRfEdges, rfNodes, rfEdges, makeRfNode, dynamicExpansion]
+    [visibleNodeIds, setVisibleNodeIds, setRfNodes, setRfEdges, rfNodes, rfEdges, makeRfNode, dynamicExpansion, fitView]
   );
 
   // Handle drag over from catalog
@@ -2674,7 +2460,21 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
           onDragOver={handleDragOver}
         >
           <ReactFlow
-            nodes={rfNodesWithHandlers as any}
+            nodes={rfNodesWithHandlers.map(node => {
+              if (node.type === 'group') {
+                return {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    onResize: (width: number, height: number) => handleGroupResize(node.id, width, height),
+                    onToggleCollapse: () => handleGroupToggleCollapse(node.id),
+                    onRemoveGroup: () => handleRemoveGroup(node.id),
+                    onSelectNode: () => setSelectedNodeIds(new Set([node.id])),
+                  }
+                };
+              }
+              return node;
+            }) as any}
             edges={allEdges as any}
             onNodesChange={handleNodesChange}
             onEdgesChange={onEdgesChange}
@@ -2695,10 +2495,28 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
             zoomOnScroll={false}
             zoomOnPinch={true}
             zoomOnDoubleClick={true}
+            onMoveEnd={(_, viewport) => setCurrentZoom(viewport.zoom)}
           >
             <Background />
-            <MiniMap pannable zoomable />
             <Controls />
+            
+            {/* Debug: Zoom Level Display */}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 12,
+                left: 60,
+                background: 'rgba(0, 0, 0, 0.7)',
+                color: '#00ff00',
+                padding: '4px 8px',
+                borderRadius: 4,
+                fontSize: 11,
+                fontFamily: 'monospace',
+                zIndex: 1000,
+              }}
+            >
+              Zoom: {(currentZoom * 100).toFixed(0)}%
+            </div>
             
             {/* Zoom Tooltip */}
             {showZoomTooltip && (
@@ -2783,62 +2601,6 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
                 >
                   Filter
                 </Button>
-                
-                        {/* State Management Buttons */}
-                        <Button 
-                          variant="secondary" 
-                          size="md"
-                          level="reactflow"
-                          onClick={saveCurrentState}
-                        >
-                          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H2zm0 1h12v12H2V2zm2 2a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H4zm0 1h8v6H4V4z"/>
-                          </svg>
-                          Save State
-                        </Button>
-                        
-                        <Button 
-                          variant="secondary" 
-                          size="md"
-                          level="reactflow"
-                          onClick={restoreSavedState}
-                          disabled={!savedLayout}
-                        >
-                          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
-                            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
-                          </svg>
-                          Restore State
-                        </Button>
-                
-                <Button 
-                  variant="secondary" 
-                  size="md"
-                  level="reactflow"
-                  onClick={resetToDefaultLayout}
-                  disabled={!defaultLayout}
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2v1z"/>
-                    <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466z"/>
-                  </svg>
-                  Reset
-                </Button>
-                
-                        <Button 
-                          variant="secondary" 
-                          size="md"
-                          level="reactflow"
-                          onClick={clearSavedState}
-                          disabled={!savedLayout}
-                        >
-                          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5z"/>
-                            <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
-                          </svg>
-                          Clear Saved
-                        </Button>
-                
                 <Button 
                   variant="secondary" 
                   size="md"
@@ -2848,13 +2610,29 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
                   {showAllChildren ? 'Hide all columns' : 'Show all columns'}
                 </Button>
                 <Button 
-                  variant="secondary" 
+                  variant="secondary"
                   size="md"
                   level="reactflow"
-                  onClick={tidyUpNodes}
+                  onClick={() => {
+                    setAutoLayoutEnabled(!autoLayoutEnabled);
+                    if (!autoLayoutEnabled) {
+                      // Trigger layout immediately when enabling
+                      setTimeout(() => applyAutoLayout(), 50);
+                    }
+                  }}
                 >
-                  Tidy Up
+                  {autoLayoutEnabled ? 'Auto Layout: On' : 'Auto Layout: Off'}
                 </Button>
+                {!autoLayoutEnabled && (
+                  <Button 
+                    variant="secondary" 
+                    size="md"
+                    level="reactflow"
+                    onClick={tidyUpNodes}
+                  >
+                    Tidy Up
+                  </Button>
+                )}
                 <Button 
                   variant="secondary" 
                   size="md"
@@ -3299,6 +3077,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
           onAddSchema={handleAddSchemaFromCatalog}
           onDragStart={() => console.log('Drag started from catalog')}
         />
+
       </div>
     </>
   );
@@ -3318,6 +3097,7 @@ export function GraphView({ onDemoModeChange }: GraphViewProps = {}) {
           </GraphProvider>
         </ReactFlowProvider>
       </div>
+
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { IconButton } from './IconButton';
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Handle, Position, NodeToolbar } from 'reactflow';
+import { Handle, Position, NodeToolbar, useUpdateNodeInternals } from 'reactflow';
 import type { ObjType, ColumnMetadata } from '../lib/types';
 import { colors, nodeCard } from '../styles';
 import { tokens } from '../lib/tokens';
@@ -77,6 +77,14 @@ function typeStyle(t: ObjType) {
       return colors.external;
     case 'EXT_STAGE':
       return colors.external;
+    case 'GROUP':
+      return colors.group || { background: '#f8f9fa', border: '#e9ecef', text: '#495057' };
+    case 'DOCUMENTATION':
+      return colors.documentation || { background: '#fff3cd', border: '#ffeaa7', text: '#856404' };
+    case 'STICKY_NOTE':
+      return colors.stickyNote || { background: '#fef3c7', border: '#f59e0b', text: '#92400e' };
+    case 'EMPTY_CARD':
+      return colors.emptyCard || { background: '#f8f9fa', border: '#6c757d', text: '#495057' };
     default:
       return colors.default;
   }
@@ -140,7 +148,43 @@ function TypeIcon({ type }: { type: ObjType }) {
           <path d="M9.5 10C9.77614 10 10 10.2239 10 10.5V14H9V11.707L4.85352 15.8535L4.14648 15.1465L8.29297 11H6V10H9.5Z" fill="#5D6A85"/>
           <path fill-rule="evenodd" clip-rule="evenodd" d="M11.5 3C12.3284 3 12.9999 3.67163 13 4.5V5H13.5C14.3284 5 14.9999 5.67163 15 6.5V11.5C14.9999 12.3284 14.3284 13 13.5 13H12V12H13.5C13.7761 12 13.9999 11.7761 14 11.5V6.5C13.9999 6.22391 13.7761 6 13.5 6H11V7.5C10.9999 7.77609 10.7761 8 10.5 8H5.5C5.2239 8 5.00007 7.77609 5 7.5V6H2.5C2.2239 6 2.00007 6.22391 2 6.5V11.5C2.00007 11.7761 2.2239 12 2.5 12H3V13H2.5C1.67161 13 1.00007 12.3284 1 11.5V6.5C1.00007 5.67163 1.67161 5 2.5 5H3V4.5C3.00007 3.67163 3.67161 3 4.5 3H11.5ZM4.5 4C4.2239 4 4.00007 4.22391 4 4.5V5H5.5C5.7761 5 5.99993 5.22391 6 5.5V7H10V5.5C10.0001 5.22391 10.2239 5 10.5 5H12V4.5C11.9999 4.22391 11.7761 4 11.5 4H4.5Z" fill="#5D6A85"/>
         </svg>
-      );  
+      );
+    case 'GROUP':
+      return (
+        <svg {...iconProps} viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M2 3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V13C14 13.5523 13.5523 14 13 14H3C2.44772 14 2 13.5523 2 13V3ZM3 3V13H13V3H3Z" fill="#5D6A85"/>
+          <path d="M5 6H11V7H5V6Z" fill="#5D6A85"/>
+          <path d="M5 8H11V9H5V8Z" fill="#5D6A85"/>
+          <path d="M5 10H9V11H5V10Z" fill="#5D6A85"/>
+        </svg>
+      );
+    case 'DOCUMENTATION':
+      return (
+        <svg {...iconProps} viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M3 2C2.44772 2 2 2.44772 2 3V13C2 13.5523 2.44772 14 3 14H13C13.5523 14 14 13.5523 14 13V6L10 2H3ZM3 3H9V6H12V13H3V3ZM10 5V3.41421L11.5858 5H10Z" fill="#5D6A85"/>
+          <path d="M5 8H11V9H5V8Z" fill="#5D6A85"/>
+          <path d="M5 10H11V11H5V10Z" fill="#5D6A85"/>
+          <path d="M5 12H9V13H5V12Z" fill="#5D6A85"/>
+        </svg>
+      );
+    case 'STICKY_NOTE':
+      return (
+        <svg {...iconProps} viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M3 2C2.44772 2 2 2.44772 2 3V13C2 13.5523 2.44772 14 3 14H13C13.5523 14 14 13.5523 14 13V6L10 2H3ZM3 3H9V6H12V13H3V3ZM10 5V3.41421L11.5858 5H10Z" fill="#5D6A85"/>
+          <path d="M5 8H11V9H5V8Z" fill="#5D6A85"/>
+          <path d="M5 10H11V11H5V10Z" fill="#5D6A85"/>
+          <path d="M5 12H9V13H5V12Z" fill="#5D6A85"/>
+        </svg>
+      );
+    case 'EMPTY_CARD':
+      return (
+        <svg {...iconProps} viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M2 3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V13C14 13.5523 13.5523 14 13 14H3C2.44772 14 2 13.5523 2 13V3ZM3 3V13H13V3H3Z" fill="#5D6A85"/>
+          <path d="M5 6H11V7H5V6Z" fill="#5D6A85"/>
+          <path d="M5 8H11V9H5V8Z" fill="#5D6A85"/>
+          <path d="M5 10H9V11H5V10Z" fill="#5D6A85"/>
+        </svg>
+      );
     default:
       return (
         <svg {...iconProps} viewBox="0 0 16 16" fill="currentColor">
@@ -235,6 +279,14 @@ function typeDisplay(t: ObjType) {
       return 'External table';
     case 'EXT_STAGE':
       return 'External stage';
+    case 'GROUP':
+      return 'Group';
+    case 'DOCUMENTATION':
+      return 'Documentation';
+    case 'STICKY_NOTE':
+      return 'Sticky Note';
+    case 'EMPTY_CARD':
+      return 'Empty Card';
     default:
       return 'Object';
   }
@@ -774,6 +826,9 @@ export function NodeCard({ data }: { data: NodeCardData }) {
   const dynamicExpansion = useDynamicExpansion();
   const expansionState = dynamicExpansion.getExpansionState(data.id);
   
+  // Hook to update node internals (handle positions) when they change
+  const updateNodeInternals = useUpdateNodeInternals();
+  
   // Debug logging
   useEffect(() => {
     console.log('🔗 NodeCard expansion state for', data.id, ':', expansionState);
@@ -799,6 +854,18 @@ export function NodeCard({ data }: { data: NodeCardData }) {
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const upstreamMenuButtonRef = useRef<HTMLButtonElement>(null);
   const downstreamMenuButtonRef = useRef<HTMLButtonElement>(null);
+  
+  // Update node internals when focused child or selected children change
+  // This tells ReactFlow to recalculate handle positions when columns are pinned/unpinned
+  useEffect(() => {
+    if (data.childrenExpanded) {
+      // Small delay to ensure DOM has fully updated before recalculating
+      const timer = setTimeout(() => {
+        updateNodeInternals(data.id);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [data.focusedChild, data.selectedChildren, data.id, data.childrenExpanded, updateNodeInternals]);
 
   // Trigger ReactFlow layout recalculation when children list height changes
   useEffect(() => {
@@ -1266,16 +1333,65 @@ export function NodeCard({ data }: { data: NodeCardData }) {
               )}
             </div>
           </div>
+          
+          {/* Pinned selected column - shown between search and scrollable list */}
+          {(() => {
+            // Only pin the column that was explicitly clicked by the user (focusedChild)
+            // This ensures only the primary selected column is pinned, not related columns in other nodes
+            const pinnedColumnName = data.focusedChild;
+            const pinnedChild = pinnedColumnName 
+              ? data.children.find(child => child.name === pinnedColumnName)
+              : null;
+            
+            if (!pinnedChild) return null;
+            
+            return (
+              <div className="pinned-column-section">
+                <div 
+                  className="child-item selected pinned focused"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Clicking pinned column deselects it
+                    data.onSelectChild?.(pinnedChild.name);
+                  }}
+                  onMouseEnter={() => {
+                    data.onHoverChild?.(pinnedChild.name);
+                  }}
+                  onMouseLeave={() => {
+                    data.onUnhoverChild?.();
+                  }}
+                >
+                  {/* Column input handle */}
+                  <Handle
+                    type="target"
+                    position={Position.Left}
+                    id={`${data.id}-${pinnedChild.name}-in`}
+                    className="column-handle column-handle-input"
+                  />
+                  
+                  <span className="child-name">
+                    <ColumnTypeIcon type={pinnedChild.type} />
+                    {pinnedChild.name}
+                  </span>
+                  
+                  {/* Column output handle */}
+                  <Handle
+                    type="source"
+                    position={Position.Right}
+                    id={`${data.id}-${pinnedChild.name}-out`}
+                    className="column-handle column-handle-output"
+                  />
+                </div>
+              </div>
+            );
+          })()}
+          
           <div 
             className="children-list nopan nodrag"
             style={{ 
               maxHeight: isAutoExpanded ? 'none' : `${childrenListHeight}px`,
               overflow: isAutoExpanded ? 'visible' : 'auto',
               overflowY: isAutoExpanded ? 'visible' : 'auto'
-            }}
-            onWheel={() => {
-              // Clear column lineage when user scrolls
-              data.onClearColumnLineage?.();
             }}
           >
             {data.children
@@ -1285,6 +1401,11 @@ export function NodeCard({ data }: { data: NodeCardData }) {
                 const query = searchQuery.toLowerCase();
                 return child.name.toLowerCase().includes(query) || 
                        child.type.toLowerCase().includes(query);
+              })
+              .filter(child => {
+                // Hide the pinned column from the scrollable list
+                // Only focusedChild (the column user explicitly clicked) is pinned
+                return child.name !== data.focusedChild;
               })
               .map((child, index) => {
                 const isSelected = data.selectedChildren?.has(child.name) || false;
@@ -1299,7 +1420,7 @@ export function NodeCard({ data }: { data: NodeCardData }) {
                   className={`child-item ${isSelected ? 'selected' : ''} ${isFocused ? 'focused' : ''} ${isRelatedColumn ? 'related' : ''}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    // First handle selection for lineage
+                    // First handle selection for lineage - this will replace the currently selected column
                     data.onSelectChild?.(child.name);
                     // Then handle focus for side panel
                     data.onFocusChild?.(child.name);
@@ -1317,15 +1438,6 @@ export function NodeCard({ data }: { data: NodeCardData }) {
                     position={Position.Left}
                     id={`${data.id}-${child.name}-in`}
                     className="column-handle column-handle-input"
-                    style={{
-                      left: 0,
-                      top: '50% !important',
-                      transform: 'translate(-50%, -50%)',
-                      width: 1,
-                      height: 1,
-                      background: 'transparent',
-                      border: 'none'
-                    }}
                   />
                   
                   <span className="child-name">
@@ -1339,15 +1451,6 @@ export function NodeCard({ data }: { data: NodeCardData }) {
                     position={Position.Right}
                     id={`${data.id}-${child.name}-out`}
                     className="column-handle column-handle-output"
-                    style={{
-                      right: 0,
-                      top: '50% !important',
-                      transform: 'translate(50%, -50%)',
-                      width: 1,
-                      height: 1,
-                      background: 'transparent',
-                      border: 'none'
-                    }}
                   />
                 </div>
               );
@@ -1439,18 +1542,6 @@ export function NodeCard({ data }: { data: NodeCardData }) {
             </svg>
             Search upstream nodes
           </div>
-          <div 
-            className="overflow-menu-item"
-            onClick={() => {
-              console.log('Add new upstream node', data.id);
-              setShowUpstreamMenu(false);
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: 8 }}>
-              <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-            Add new node
-          </div>
         </div>,
         document.body
       )}
@@ -1481,18 +1572,6 @@ export function NodeCard({ data }: { data: NodeCardData }) {
               <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
             Search downstream nodes
-          </div>
-          <div 
-            className="overflow-menu-item"
-            onClick={() => {
-              console.log('Add new downstream node', data.id);
-              setShowDownstreamMenu(false);
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: 8 }}>
-              <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-            Add new node
           </div>
         </div>,
         document.body

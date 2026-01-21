@@ -7,22 +7,12 @@ export async function elkLayout(
   nodes: Node[],
   edges: Edge[],
   dir: 'RIGHT' | 'LEFT' | 'DOWN' | 'UP' = 'RIGHT',
-  isExpansion: boolean = false,
-  verticalSpacingMultiplier: number = 1, // Additional multiplier for vertical spacing only
 ) {
-  // Base spacing values (original values)
-  const baseSpacing = {
-    nodeNodeBetweenLayers: 80,
-    nodeNode: 60,
-    edgeNodeBetweenLayers: 40,
-  };
-
-  // Calculate spacing based on whether this is an expansion (200% increase from base)
-  const spacingMultiplier = isExpansion ? 6 : 2; // 6x for expansion (200% increase), 2x for normal (33% reduction from 3x)
+  // Consistent spacing values
   const spacing = {
-    nodeNodeBetweenLayers: baseSpacing.nodeNodeBetweenLayers * spacingMultiplier, // Horizontal spacing
-    nodeNode: baseSpacing.nodeNode * spacingMultiplier * verticalSpacingMultiplier, // Vertical spacing with additional multiplier
-    edgeNodeBetweenLayers: baseSpacing.edgeNodeBetweenLayers * spacingMultiplier,
+    nodeNodeBetweenLayers: 120, // Horizontal spacing between layers (columns)
+    nodeNode: 40, // Vertical spacing between nodes in same layer
+    edgeNodeBetweenLayers: 40, // Edge to node spacing
   };
 
   const graph = {
@@ -33,12 +23,14 @@ export async function elkLayout(
       'elk.layered.spacing.nodeNodeBetweenLayers': spacing.nodeNodeBetweenLayers.toString(),
       'elk.spacing.nodeNode': spacing.nodeNode.toString(),
       'elk.layered.spacing.edgeNodeBetweenLayers': spacing.edgeNodeBetweenLayers.toString(),
-      'elk.layered.cycleBreaking.strategy': 'INTERACTIVE',
+      // Ensure consistent alignment within layers
+      'elk.layered.nodePlacement.strategy': 'SIMPLE',
+      'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
     },
     children: nodes.map((n) => ({
       id: n.id,
-      width: Math.max(400, (n as any).width || 400),
-      height: Math.max(160, (n as any).height || 160),
+      width: (n as any).width || 280,
+      height: (n as any).height || 160,
     })),
     edges: edges.map((e) => ({ id: e.id, sources: [e.source], targets: [e.target] })),
   } as any;

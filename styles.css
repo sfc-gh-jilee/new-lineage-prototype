@@ -496,6 +496,31 @@ body {
 .node-card-model {
 } */
 
+/* New node types */
+.node-card-group {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  color: #495057;
+}
+
+.node-card-documentation {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  color: #856404;
+}
+
+.node-card-sticky-note {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  color: #92400e;
+}
+
+.node-card-empty-card {
+  background: #f8f9fa;
+  border: 1px solid #6c757d;
+  color: #495057;
+}
+
 /* ReactFlow Handle Customization */
 .react-flow__handle {
   background: transparent !important;
@@ -1150,6 +1175,25 @@ hr {
 @media (prefers-reduced-motion: reduce) {
 }
 
+/* Pinned column section - fixed position between search and scrollable list */
+.pinned-column-section {
+  margin: 0 -8px;
+  padding: 2px 0;
+}
+
+.pinned-column-section .child-item.pinned {
+  background-color: #D6E6FF;
+  border-radius: 4px;
+}
+
+.pinned-column-section .child-item.pinned:hover {
+  background-color: #C5DAFF;
+}
+
+.pinned-column-section .child-item.pinned .column-handle {
+  opacity: 1;
+}
+
 .children-list {
   display: flex;
   flex-direction: column;
@@ -1252,7 +1296,8 @@ hr {
   min-height: auto !important; */
   background: transparent !important;
   border: none !important;
-  top: calc(50% + 8px) !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
 }
 
 .child-item:hover .column-handle,
@@ -1293,10 +1338,12 @@ hr {
 
 .column-handle-input {
   background: transparent !important;
+  left: 0 !important;
 }
 
 .column-handle-output {
   background: transparent !important;
+  right: 0 !important;
 }
 
 /* Main table handles - higher priority than column handles */

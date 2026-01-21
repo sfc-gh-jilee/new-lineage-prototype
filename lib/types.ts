@@ -1,4 +1,4 @@
-export type ObjType = 'TABLE' | 'VIEW' | 'STAGE' | 'DATASET' | 'MODEL' | 'EXTERNAL' | 'EXT_TABLE' | 'EXT_STAGE';
+export type ObjType = 'TABLE' | 'VIEW' | 'STAGE' | 'DATASET' | 'MODEL' | 'EXTERNAL' | 'EXT_TABLE' | 'EXT_STAGE' | 'GROUP' | 'DOCUMENTATION' | 'STICKY_NOTE' | 'EMPTY_CARD';
 
 export type ColumnMetadata = {
   name: string;
@@ -52,4 +52,63 @@ export type ColumnLineageEdge = {
   targetTable: string;
   targetColumn: string;
   relation?: string;
+};
+
+
+export type GroupNode = {
+  id: string;
+  name: string;
+  label: string;
+  objType: 'GROUP';
+  description?: string;
+  groupedNodeIds: string[];
+  color?: string;
+  icon?: string;
+  isCollapsed?: boolean;
+};
+
+export type DocumentationNode = {
+  id: string;
+  name: string;
+  label: string;
+  objType: 'DOCUMENTATION';
+  content: string;
+  contentType: 'markdown' | 'html' | 'text';
+  title?: string;
+  author?: string;
+  lastUpdated?: string;
+  tags?: string[];
+  relatedNodeIds?: string[];
+};
+
+export type StickyNoteNode = {
+  id: string;
+  name: string;
+  label: string;
+  objType: 'STICKY_NOTE';
+  content: string;
+  color: 'yellow' | 'blue' | 'green' | 'pink' | 'purple' | 'orange';
+  width: number;
+  height: number;
+  position: { x: number; y: number };
+};
+
+export type EmptyCardNode = {
+  id: string;
+  name: string;
+  label: string;
+  objType: 'EMPTY_CARD';
+  title: string;
+  path: string;
+  description?: string;
+  metadata?: {
+    dataQualityScore?: number;
+    createdTimestamp?: string;
+    error?: string | string[];
+    warning?: string | string[];
+  };
+  children?: Array<{ name: string; type: string }>;
+  columnsMetadata?: ColumnMetadata[];
+  brandIcon?: string;
+  customFields?: Record<string, any>;
 };

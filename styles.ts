@@ -21,5 +21,9 @@ export const colors = {
   dataset: 'node-card-dataset',
   model: 'node-card-model',
   external: 'node-card-external',
+  group: 'node-card-group',
+  documentation: 'node-card-documentation',
+  stickyNote: 'node-card-sticky-note',
+  emptyCard: 'node-card-empty-card',
   default: 'node-card-default'
-};
+} ;
