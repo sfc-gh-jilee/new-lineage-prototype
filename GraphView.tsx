@@ -93,7 +93,7 @@ function createColumnLineageEdges(
         className: 'focused', // Use focused style (1px dashed animated)
         style: {
           stroke: '#1A6CE7', // Blue for focused column lineage
-          strokeWidth: 1,
+          strokeWidth: 1.5,
           strokeDasharray: '5,5',
           opacity: 1
         },
@@ -133,9 +133,9 @@ function createColumnLineageEdges(
         type: 'default',
         selected: false,
         style: {
-          stroke: '#D5DAE4', // Light gray for hovered
-          strokeWidth: 1,
-          strokeDasharray: '3,3',
+          stroke: '#5D6A85', // Light gray for hovered
+          strokeWidth: 1.5,
+          strokeDasharray: '3.3',
           opacity: 1
         },
         data: { 
@@ -256,6 +256,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
   const isCenteringScheduledRef = useRef(false);
 
   // Helper to get node bounds (position + dimensions)
+  // For nodes inside groups, calculates absolute position by adding parent's position
   const getNodeBounds = useCallback((nodeId: string) => {
     const node = nodesRef.current.find(n => n.id === nodeId);
     if (!node) return null;
@@ -264,13 +265,25 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
     const width = nodeAny.measured?.width || node.width || 280;
     const height = nodeAny.measured?.height || node.height || 160;
     
+    // Calculate absolute position (accounting for parent group if any)
+    let absoluteX = node.position.x;
+    let absoluteY = node.position.y;
+    
+    if (node.parentId) {
+      const parentNode = nodesRef.current.find(n => n.id === node.parentId);
+      if (parentNode) {
+        absoluteX += parentNode.position.x;
+        absoluteY += parentNode.position.y;
+      }
+    }
+    
     return {
-      x: node.position.x,
-      y: node.position.y,
+      x: absoluteX,
+      y: absoluteY,
       width,
       height,
-      right: node.position.x + width,
-      bottom: node.position.y + height,
+      right: absoluteX + width,
+      bottom: absoluteY + height,
     };
   }, []);
 
@@ -499,8 +512,8 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
         const nodeWidth = 280;
         const nodeHeight = 110; // Collapsed node card height (actual rendered ~100-110px)
         const nodeHeightExpanded = 400; // Expanded node card height with columns
-        const nodeSpacingV = 24; // Vertical spacing between nodes in same layer
-        const layerSpacing = 100; // Horizontal spacing between layers
+        const nodeSpacingV = 40; // Vertical spacing between nodes in same layer
+        const layerSpacing = 120; // Horizontal spacing between layers
         
         // Calculate relative depth for each node within the group
         // based on edges connecting to/from nodes in this group
@@ -870,8 +883,8 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
     const nodeWidth = 280;
     const nodeHeight = 110; // Collapsed node card height
     const nodeHeightExpanded = 400; // Expanded node card height with columns
-    const nodeSpacingV = 24; // Vertical spacing between nodes in same layer
-    const layerSpacing = 100; // Horizontal spacing between layers
+    const nodeSpacingV = 40; // Vertical spacing between nodes in same layer
+    const layerSpacing = 120; // Horizontal spacing between layers
     
     let needsUpdate = false;
     const groupUpdates: Map<string, { width: number; height: number }> = new Map();

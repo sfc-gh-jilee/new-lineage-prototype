@@ -10,7 +10,7 @@ export async function elkLayout(
 ) {
   // Consistent spacing values
   const spacing = {
-    nodeNodeBetweenLayers: 120, // Horizontal spacing between layers (columns)
+    nodeNodeBetweenLayers: 160, // Horizontal spacing between layers (columns)
     nodeNode: 40, // Vertical spacing between nodes in same layer
     edgeNodeBetweenLayers: 40, // Edge to node spacing
   };

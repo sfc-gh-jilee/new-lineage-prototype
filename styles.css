@@ -277,8 +277,8 @@
 
 /* Selected state - shows connector name badge */
 .edge-label-card.selected {
-  background-color: #eff6ff;
-  border: 1.5px solid var(--edge-selected-color);
+  /* background-color: #eff6ff; */
+  border: 2px solid var(--edge-selected-color);
   padding: 4px 8px;
   width: auto;
   border-radius: 4px;
@@ -595,15 +595,15 @@ body {
   
   /* Hover edge */
   --edge-hover-color: #5D6A85;
-  --edge-hover-width: 1px;
+  --edge-hover-width: 1.5px;
   
   /* Selected edge */
   --edge-selected-color: #1A6CE7;
-  --edge-selected-width: 2px;
+  --edge-selected-width: 2.5px;
   
   /* Focused edge (when node/column selected) */
   --edge-focused-color: #1A6CE7;
-  --edge-focused-width: 1px;
+  --edge-focused-width: 1.5px;
   
   /* Inactive/dimmed edge */
   --edge-inactive-color: #D5DAE4;
