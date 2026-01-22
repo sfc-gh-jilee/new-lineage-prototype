@@ -22,6 +22,14 @@ export type ColumnMetadata = {
   };
 };
 
+export type DataSource = {
+  id: string;           // Unique source identifier (e.g., 'databricks-selectstar', 'snowhouse-account')
+  name: string;         // Display name (e.g., 'DATABRICKS', 'SNOWHOUSE')
+  type: string;         // Source type description (e.g., 'SelectStar connector', 'Snowflake account')
+  icon?: string;        // Optional icon path
+  isExternal: boolean;  // true for external (Databricks, Salesforce), false for internal (other Snowflake accounts)
+};
+
 export type LineageNode = {
   id: string;
   name: string;
@@ -36,6 +44,7 @@ export type LineageNode = {
   children?: Array<{ name: string; type: string }>; // Simple version for display
   columnsMetadata?: ColumnMetadata[]; // Detailed version for side panel
   brandIcon?: string; // Path to brand icon for external nodes
+  source?: DataSource; // Data source for visual grouping
 };
 
 export type LineageEdge = {

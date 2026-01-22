@@ -844,7 +844,9 @@ export function NodeCard({ data }: { data: NodeCardData }) {
   const lastClickTimeRef = useRef<number>(0);
   const [isHovered, setIsHovered] = useState(false);
   const [isToolbarHovered, setIsToolbarHovered] = useState(false);
+  const [forceHideToolbars, setForceHideToolbars] = useState(false); // Instantly hide toolbars on action click
   const hoverTimeoutRef = useRef<number | null>(null);
+  const forceHideTimeoutRef = useRef<number | null>(null);
   
   // Update node internals when focused child or selected children change
   // This tells ReactFlow to recalculate handle positions when columns are pinned/unpinned
@@ -919,7 +921,22 @@ export function NodeCard({ data }: { data: NodeCardData }) {
   };
 
   // Determine if toolbars should be visible
-  const showToolbars = isHovered || isToolbarHovered || data.selected;
+  // forceHideToolbars instantly hides toolbars when user clicks on action buttons
+  const showToolbars = !forceHideToolbars && (isHovered || isToolbarHovered || data.selected);
+  
+  // Helper to instantly hide toolbars on action click
+  const hideToolbarsOnAction = () => {
+    setForceHideToolbars(true);
+    setIsHovered(false);
+    setIsToolbarHovered(false);
+    // Reset after a delay to allow hover to work again
+    if (forceHideTimeoutRef.current) {
+      clearTimeout(forceHideTimeoutRef.current);
+    }
+    forceHideTimeoutRef.current = setTimeout(() => {
+      setForceHideToolbars(false);
+    }, 500) as unknown as number;
+  };
 
   const handleDoubleClick = () => {
     if (isAutoExpanded) {
@@ -1048,6 +1065,7 @@ export function NodeCard({ data }: { data: NodeCardData }) {
           <IconButton
             aria-label="Toggle upstream"
             onClick={() => {
+              hideToolbarsOnAction();
               data.onToggleUpstream?.();
             }}
             size="sm"
@@ -1076,6 +1094,7 @@ export function NodeCard({ data }: { data: NodeCardData }) {
           <IconButton
             aria-label="Toggle downstream"
             onClick={() => {
+              hideToolbarsOnAction();
               data.onToggleDownstream?.();
             }}
             size="sm"
@@ -1104,7 +1123,10 @@ export function NodeCard({ data }: { data: NodeCardData }) {
           >
             <IconButton
               aria-label={data.childrenExpanded ? `Hide ${data.objType === 'MODEL' ? 'features' : 'columns'}` : `View ${data.objType === 'MODEL' ? 'features' : 'children'}`}
-              onClick={() => data.onToggleChildren?.()}
+              onClick={() => {
+                hideToolbarsOnAction();
+                data.onToggleChildren?.();
+              }}
               size="sm"
               variant="secondary"
               level="nodecard"

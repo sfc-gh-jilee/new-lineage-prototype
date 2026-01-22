@@ -24,6 +24,7 @@ import { CatalogPanel } from './components/CatalogPanel';
 import { customEdgeTypes } from './components/CustomEdge';
 import { NodeCard, type NodeCardData } from './components/NodeCard';
 import { GroupNodeCard } from './components/GroupNode';
+import { SourceGroupNode, type SourceGroupNodeData } from './components/SourceGroupNode';
 import { DocumentationNodeCard } from './components/DocumentationNode';
 import { StickyNoteNodeCard } from './components/StickyNoteNode';
 import { EmptyCardNodeCard } from './components/EmptyCardNode';
@@ -35,21 +36,29 @@ import { elkLayout } from './lib/elkLayout';
 import { ALL_EDGES, NODE_BY_ID, COLUMN_LINEAGE, ALL_NODES } from './lib/mockData';
 import { ALL_CATALOG_NODES } from './lib/catalogData';
 import { ALL_CATALOG_EDGES } from './lib/catalogData';
-import type { LineageNode } from './lib/types';
+import type { LineageNode, DataSource } from './lib/types';
 import { container } from './styles.stylex';
 
 type EdgeData = { relation?: string; isColumnEdge?: boolean; isSelected?: boolean };
 const nodeTypes = { 
   lineage: NodeCard,
   group: GroupNodeCard,
+  sourceGroup: SourceGroupNode,
   documentation: DocumentationNodeCard,
   stickyNote: StickyNoteNodeCard,
   emptyCard: EmptyCardNodeCard,
 } as const;
 const edgeTypes = customEdgeTypes;
 
-function makeRfNode(d: LineageNode & Partial<NodeCardData>): Node<NodeCardData> {
-  return { id: d.id, type: 'lineage', data: { ...d }, position: { x: 0, y: 0 } };
+function makeRfNode(d: LineageNode & Partial<NodeCardData>, options?: { hidden?: boolean }): Node<NodeCardData> {
+  return { 
+    id: d.id, 
+    type: 'lineage', 
+    data: { ...d }, 
+    position: { x: 0, y: 0 },
+    // If hidden flag is set, start with opacity 0 for fade-in animation
+    ...(options?.hidden ? { style: { opacity: 0 } } : {}),
+  };
 }
 
 // Create column lineage edges when a column is selected or hovered
@@ -214,6 +223,10 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
   const [selectedChildrenByNode, setSelectedChildrenByNode] = useState<Record<string, Set<string>>>({});
   // Pinned columns by node - each node can have one pinned column shown above the scrollable list
   const [pinnedColumnsByNode, setPinnedColumnsByNode] = useState<Record<string, string>>({});
+  
+  // Source grouping - tracks which source groups are active
+  const [sourceGroupsEnabled, setSourceGroupsEnabled] = useState<boolean>(true);
+  const sourceGroupsRef = useRef<Map<string, { nodeIds: Set<string> }>>(new Map());
   // Legacy single focused column for drawer (the primary selected column)
   const [focusedColumn, setFocusedColumn] = useState<{
     nodeId: string;
@@ -393,6 +406,605 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
 
   useEffect(() => void (nodesRef.current = rfNodes), [rfNodes]);
   useEffect(() => void (edgesRef.current = rfEdges), [rfEdges]);
+
+  // Source grouping - creates parent group nodes for nodes with same source
+  // Uses React Flow's parent-child relationship for proper layout
+  const updateSourceGroupsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isUpdatingSourceGroupsRef = useRef(false);
+  
+  // Calculate source groups and update nodes with parent-child relationships
+  const updateSourceGroups = useCallback(() => {
+    if (!sourceGroupsEnabled || isUpdatingSourceGroupsRef.current) return;
+    
+    // Clear any pending timeout
+    if (updateSourceGroupsTimeoutRef.current) {
+      clearTimeout(updateSourceGroupsTimeoutRef.current);
+    }
+    
+    updateSourceGroupsTimeoutRef.current = setTimeout(() => {
+      isUpdatingSourceGroupsRef.current = true;
+      
+      const currentNodes = nodesRef.current;
+      
+      // Get all lineage nodes that have a source property and are NOT already children
+      const ungroupedSourceNodes = currentNodes.filter(n => 
+        n.type === 'lineage' && 
+        (n.data as any)?.source &&
+        !n.parentId // Not already a child of a group
+      );
+      
+      if (ungroupedSourceNodes.length === 0) {
+        // Check if we need to remove any orphaned groups
+        const hasSourceGroups = currentNodes.some(n => n.id.startsWith('source-group-'));
+        if (hasSourceGroups) {
+          const groupsWithoutChildren = currentNodes.filter(n => 
+            n.id.startsWith('source-group-') &&
+            !currentNodes.some(c => c.parentId === n.id)
+          );
+          if (groupsWithoutChildren.length > 0) {
+            setRfNodes(prev => prev.filter(n => 
+              !groupsWithoutChildren.some(g => g.id === n.id)
+            ));
+          }
+        }
+        isUpdatingSourceGroupsRef.current = false;
+        return;
+      }
+      
+      // Group ungrouped nodes by source ID
+      const nodesBySource = new Map<string, Node<any>[]>();
+      ungroupedSourceNodes.forEach(node => {
+        const source = (node.data as any).source as DataSource;
+        if (!source?.id) return;
+        
+        if (!nodesBySource.has(source.id)) {
+          nodesBySource.set(source.id, []);
+        }
+        nodesBySource.get(source.id)!.push(node);
+      });
+      
+      const sourcesToProcess = Array.from(nodesBySource.entries())
+        .filter(([_, nodes]) => nodes.length >= 1);
+      
+      if (sourcesToProcess.length === 0) {
+        isUpdatingSourceGroupsRef.current = false;
+        return;
+      }
+      
+      // Process each source - create new groups or add to existing ones
+      const newGroups: Node<SourceGroupNodeData>[] = [];
+      const childUpdates: Map<string, { parentId: string; relativePosition: XYPosition }> = new Map();
+      const groupUpdates: Map<string, { width: number; height: number; position: XYPosition }> = new Map();
+      
+      // Get all edges for depth calculation
+      const allEdges = edgesRef.current;
+      
+      sourcesToProcess.forEach(([sourceId, newNodes]) => {
+        const source = (newNodes[0].data as any).source as DataSource;
+        const groupId = `source-group-${sourceId}`;
+        
+        // Check if group already exists
+        const existingGroup = currentNodes.find(n => n.id === groupId);
+        
+        // Get ALL nodes for this source (both existing children and new ungrouped nodes)
+        const existingChildren = currentNodes.filter(n => n.parentId === groupId);
+        const allSourceNodes = [...existingChildren, ...newNodes];
+        const nodeIds = new Set(allSourceNodes.map(n => n.id));
+        
+        // Layout constants for internal group layout
+        const paddingH = 48; // Horizontal padding (left/right)
+        const paddingTop = 56; // Top padding (after header, includes space for node type badge)
+        const paddingBottom = 24; // Bottom padding
+        const headerHeight = 40; // Group header height
+        const nodeWidth = 280;
+        const nodeHeight = 110; // Collapsed node card height (actual rendered ~100-110px)
+        const nodeHeightExpanded = 400; // Expanded node card height with columns
+        const nodeSpacingV = 24; // Vertical spacing between nodes in same layer
+        const layerSpacing = 100; // Horizontal spacing between layers
+        
+        // Calculate relative depth for each node within the group
+        // based on edges connecting to/from nodes in this group
+        const calculateInternalDepths = () => {
+          const depths = new Map<string, number>();
+          
+          // Find edges where both source and target are in this group (internal edges)
+          // OR edges where one end is in this group (external connections determine base depth)
+          const internalEdges = allEdges.filter(e => 
+            nodeIds.has(e.source) && nodeIds.has(e.target)
+          );
+          
+          // Also consider external edges to determine relative positioning
+          const incomingExternalEdges = allEdges.filter(e => 
+            !nodeIds.has(e.source) && nodeIds.has(e.target)
+          );
+          // Nodes with incoming external edges are at depth 0 (leftmost)
+          const nodesWithIncomingExternal = new Set(incomingExternalEdges.map(e => e.target));
+          
+          // Build adjacency list for internal edges
+          const successors = new Map<string, Set<string>>();
+          const predecessors = new Map<string, Set<string>>();
+          allSourceNodes.forEach(n => {
+            successors.set(n.id, new Set());
+            predecessors.set(n.id, new Set());
+          });
+          
+          internalEdges.forEach(edge => {
+            successors.get(edge.source)?.add(edge.target);
+            predecessors.get(edge.target)?.add(edge.source);
+          });
+          
+          // Calculate depths using topological ordering
+          // Start with nodes that have incoming external edges or no predecessors
+          const startNodes = allSourceNodes.filter(n => 
+            nodesWithIncomingExternal.has(n.id) || predecessors.get(n.id)?.size === 0
+          );
+          
+          // BFS to assign depths
+          const queue: string[] = startNodes.map(n => n.id);
+          startNodes.forEach(n => depths.set(n.id, 0));
+          
+          while (queue.length > 0) {
+            const nodeId = queue.shift()!;
+            const currentDepth = depths.get(nodeId) ?? 0;
+            
+            successors.get(nodeId)?.forEach(successorId => {
+              const existingDepth = depths.get(successorId);
+              const newDepth = currentDepth + 1;
+              
+              if (existingDepth === undefined || newDepth > existingDepth) {
+                depths.set(successorId, newDepth);
+                queue.push(successorId);
+              }
+            });
+          }
+          
+          // Assign depth 0 to any nodes not yet assigned (isolated nodes)
+          allSourceNodes.forEach(n => {
+            if (!depths.has(n.id)) {
+              depths.set(n.id, 0);
+            }
+          });
+          
+          return depths;
+        };
+        
+        const depths = calculateInternalDepths();
+        
+        // Group nodes by depth (layer)
+        const nodesByLayer = new Map<number, typeof allSourceNodes>();
+        allSourceNodes.forEach(node => {
+          const depth = depths.get(node.id) ?? 0;
+          if (!nodesByLayer.has(depth)) {
+            nodesByLayer.set(depth, []);
+          }
+          nodesByLayer.get(depth)!.push(node);
+        });
+        
+        // Sort layers and calculate positions
+        const sortedLayers = Array.from(nodesByLayer.entries()).sort((a, b) => a[0] - b[0]);
+        const numLayers = sortedLayers.length;
+        
+        // Calculate dimensions for each layer and total dimensions
+        let totalWidth = 0;
+        let maxLayerHeight = 0;
+        
+        const layerDimensions: { width: number; height: number; nodes: typeof allSourceNodes }[] = [];
+        
+        sortedLayers.forEach(([_, layerNodes]) => {
+          const layerHeight = layerNodes.reduce((sum, node) => {
+            const height = (node.data as any)?.childrenExpanded ? nodeHeightExpanded : nodeHeight;
+            return sum + height;
+          }, 0) + (layerNodes.length - 1) * nodeSpacingV;
+          
+          layerDimensions.push({
+            width: nodeWidth,
+            height: layerHeight,
+            nodes: layerNodes,
+          });
+          
+          maxLayerHeight = Math.max(maxLayerHeight, layerHeight);
+        });
+        
+        totalWidth = numLayers * nodeWidth + (numLayers - 1) * layerSpacing;
+        
+        // Calculate group dimensions
+        const groupWidth = totalWidth + paddingH * 2;
+        const groupHeight = maxLayerHeight + headerHeight + paddingTop + paddingBottom;
+        
+        // Calculate positions for each node
+        let currentX = paddingH;
+        layerDimensions.forEach((layer) => {
+          // Center this layer vertically within the max height
+          let currentY = headerHeight + paddingTop + (maxLayerHeight - layer.height) / 2;
+          
+          layer.nodes.forEach(node => {
+            const height = (node.data as any)?.childrenExpanded ? nodeHeightExpanded : nodeHeight;
+            childUpdates.set(node.id, {
+              parentId: groupId,
+              relativePosition: {
+                x: currentX,
+                y: currentY,
+              },
+            });
+            currentY += height + nodeSpacingV;
+          });
+          
+          currentX += nodeWidth + layerSpacing;
+        });
+        
+        if (existingGroup) {
+          // Group exists - keep position, update size
+          groupUpdates.set(groupId, {
+            width: groupWidth,
+            height: groupHeight,
+            position: existingGroup.position,
+          });
+        } else {
+          // Create new group - position at average of nodes
+          // Start hidden for smooth reveal after layout
+          const avgX = newNodes.reduce((sum, n) => sum + n.position.x, 0) / newNodes.length;
+          const avgY = newNodes.reduce((sum, n) => sum + n.position.y, 0) / newNodes.length;
+          const groupX = avgX - groupWidth / 2;
+          const groupY = avgY - groupHeight / 2;
+          
+          const groupNode: Node<SourceGroupNodeData> = {
+            id: groupId,
+            type: 'sourceGroup',
+            position: { x: groupX, y: groupY },
+            style: {
+              width: groupWidth,
+              height: groupHeight,
+              opacity: 0, // Start hidden for smooth transition
+            },
+            data: {
+              id: groupId,
+              source,
+              width: groupWidth,
+              height: groupHeight,
+            },
+            zIndex: -1,
+            draggable: true,
+            selectable: true,
+          };
+          
+          newGroups.push(groupNode);
+        }
+        
+        sourceGroupsRef.current.set(sourceId, { nodeIds: new Set(allSourceNodes.map(n => n.id)) });
+      });
+      
+      if (newGroups.length === 0 && childUpdates.size === 0 && groupUpdates.size === 0) {
+        isUpdatingSourceGroupsRef.current = false;
+        return;
+      }
+      
+      // Track nodes that need to fade in (child nodes with opacity: 0 AND new groups)
+      const nodesToFadeIn = new Set<string>();
+      currentNodes.forEach(node => {
+        if ((node.style as any)?.opacity === 0 && childUpdates.has(node.id)) {
+          nodesToFadeIn.add(node.id);
+        }
+      });
+      // Also track new groups (they start with opacity: 0)
+      newGroups.forEach(group => {
+        nodesToFadeIn.add(group.id);
+      });
+      
+      // Apply updates - position nodes and update group sizes
+      setRfNodes(prevNodes => {
+        let updatedNodes = prevNodes.map(node => {
+          // Update existing groups
+          const groupUpdate = groupUpdates.get(node.id);
+          if (groupUpdate) {
+            return {
+              ...node,
+              position: groupUpdate.position,
+              style: {
+                ...node.style,
+                width: groupUpdate.width,
+                height: groupUpdate.height,
+              },
+              data: {
+                ...node.data,
+                width: groupUpdate.width,
+                height: groupUpdate.height,
+              },
+            };
+          }
+          
+          // Update children (both existing and new) - keep opacity: 0 for now
+          const childUpdate = childUpdates.get(node.id);
+          if (childUpdate) {
+            return {
+              ...node,
+              position: childUpdate.relativePosition,
+              parentId: childUpdate.parentId,
+              extent: 'parent' as const,
+              expandParent: true,
+              zIndex: 1,
+              // Keep the node hidden if it was hidden
+              style: (node.style as any)?.opacity === 0 ? { opacity: 0 } : node.style,
+            };
+          }
+          
+          return node;
+        });
+        
+        // Add new groups at the beginning (they already have opacity: 0)
+        return [...newGroups, ...updatedNodes] as any;
+      });
+      
+      // Hide edges connected to nodes that will fade in
+      if (nodesToFadeIn.size > 0) {
+        setRfEdges(prevEdges => 
+          prevEdges.map(edge => {
+            if (nodesToFadeIn.has(edge.source) || nodesToFadeIn.has(edge.target)) {
+              return {
+                ...edge,
+                style: {
+                  ...edge.style,
+                  opacity: 0,
+                },
+              };
+            }
+            return edge;
+          })
+        );
+      }
+      
+      // After a delay to let the layout settle, fade in the nodes, groups, and edges
+      setTimeout(() => {
+        if (nodesToFadeIn.size > 0) {
+          // Fade in all hidden nodes (child nodes and new groups)
+          setRfNodes(prevNodes => 
+            prevNodes.map(node => {
+              // Fade in if node is in our tracking set OR if it has opacity: 0
+              const shouldFadeIn = nodesToFadeIn.has(node.id) || (node.style as any)?.opacity === 0;
+              if (shouldFadeIn) {
+                // For source groups, preserve width/height in style
+                const isSourceGroup = node.id.startsWith('source-group-');
+                const baseStyle = isSourceGroup ? {
+                  width: (node.style as any)?.width,
+                  height: (node.style as any)?.height,
+                } : {};
+                
+                return {
+                  ...node,
+                  style: {
+                    ...baseStyle,
+                    opacity: 1,
+                    transition: 'opacity 0.15s ease-out',
+                  },
+                };
+              }
+              return node;
+            }) as any
+          );
+          
+          // Fade in ALL edges that have opacity: 0
+          setRfEdges(prevEdges => 
+            prevEdges.map(edge => {
+              const isHidden = (edge.style as any)?.opacity === 0;
+              const connectsToFadingNode = nodesToFadeIn.has(edge.source) || nodesToFadeIn.has(edge.target);
+              if (isHidden || connectsToFadingNode) {
+                return {
+                  ...edge,
+                  style: {
+                    ...edge.style,
+                    opacity: 1,
+                    transition: 'opacity 0.15s ease-out',
+                  },
+                };
+              }
+              return edge;
+            })
+          );
+          
+          // Clean up transition styles after animation
+          setTimeout(() => {
+            setRfNodes(prevNodes => 
+              prevNodes.map(node => {
+                if ((node.style as any)?.transition) {
+                  const { transition, opacity, ...restStyle } = node.style as any;
+                  return {
+                    ...node,
+                    style: Object.keys(restStyle).length > 0 ? restStyle : undefined,
+                  };
+                }
+                return node;
+              }) as any
+            );
+            
+            setRfEdges(prevEdges => 
+              prevEdges.map(edge => {
+                if ((edge.style as any)?.transition) {
+                  const { transition, opacity, ...restStyle } = edge.style as any;
+                  return {
+                    ...edge,
+                    style: Object.keys(restStyle).length > 0 ? restStyle : undefined,
+                  };
+                }
+                return edge;
+              })
+            );
+            
+            isUpdatingSourceGroupsRef.current = false;
+          }, 200);
+        } else {
+          isUpdatingSourceGroupsRef.current = false;
+        }
+      }, 350); // Longer delay to let positioning fully complete before reveal
+    }, 100);
+  }, [sourceGroupsEnabled, setRfNodes, setRfEdges]);
+
+  // Trigger source grouping when new source nodes appear (ungrouped)
+  const ungroupedSourceNodeCount = useMemo(() => {
+    return rfNodes.filter(n => 
+      n.type === 'lineage' && 
+      (n.data as any)?.source &&
+      !n.parentId
+    ).length;
+  }, [rfNodes]);
+
+  useEffect(() => {
+    if (ungroupedSourceNodeCount > 0 && sourceGroupsEnabled) {
+      updateSourceGroups();
+    }
+  }, [ungroupedSourceNodeCount, sourceGroupsEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  
+  // Update group dimensions and re-layout children when sizes change
+  // Preserves the columnar (depth-based) layout established during group creation
+  const updateGroupDimensions = useCallback(() => {
+    if (!sourceGroupsEnabled) return;
+    
+    const currentNodes = nodesRef.current;
+    const groups = currentNodes.filter(n => n.id.startsWith('source-group-'));
+    
+    if (groups.length === 0) return;
+    
+    // Layout constants - must match updateSourceGroups
+    const paddingH = 48; // Horizontal padding (left/right)
+    const paddingTop = 56; // Top padding (after header, includes space for node type badge)
+    const paddingBottom = 24; // Bottom padding
+    const headerHeight = 40; // Group header height
+    const nodeWidth = 280;
+    const nodeHeight = 110; // Collapsed node card height
+    const nodeHeightExpanded = 400; // Expanded node card height with columns
+    const nodeSpacingV = 24; // Vertical spacing between nodes in same layer
+    const layerSpacing = 100; // Horizontal spacing between layers
+    
+    let needsUpdate = false;
+    const groupUpdates: Map<string, { width: number; height: number }> = new Map();
+    const childPositionUpdates: Map<string, { x: number; y: number }> = new Map();
+    
+    groups.forEach(group => {
+      const children = currentNodes.filter(n => n.parentId === group.id);
+      if (children.length === 0) return;
+      
+      // Group children by their current x position (column/layer)
+      // Use a tolerance to group nodes in the same column
+      const columnTolerance = 50;
+      const columns = new Map<number, typeof children>();
+      
+      children.forEach(child => {
+        // Find existing column or create new one
+        let foundColumn = false;
+        for (const [colX, colNodes] of columns.entries()) {
+          if (Math.abs(child.position.x - colX) < columnTolerance) {
+            colNodes.push(child);
+            foundColumn = true;
+            break;
+          }
+        }
+        if (!foundColumn) {
+          columns.set(child.position.x, [child]);
+        }
+      });
+      
+      // Sort columns by x position
+      const sortedColumns = Array.from(columns.entries())
+        .sort((a, b) => a[0] - b[0])
+        .map(([_, nodes]) => nodes);
+      
+      // Calculate dimensions and positions for each column
+      let maxColumnHeight = 0;
+      const columnLayouts: { nodes: typeof children; height: number }[] = [];
+      
+      sortedColumns.forEach(colNodes => {
+        const colHeight = colNodes.reduce((sum, node) => {
+          const h = (node.data as any)?.childrenExpanded ? nodeHeightExpanded : nodeHeight;
+          return sum + h;
+        }, 0) + (colNodes.length - 1) * nodeSpacingV;
+        
+        columnLayouts.push({ nodes: colNodes, height: colHeight });
+        maxColumnHeight = Math.max(maxColumnHeight, colHeight);
+      });
+      
+      // Calculate group dimensions
+      const numColumns = sortedColumns.length;
+      const newWidth = numColumns * nodeWidth + (numColumns - 1) * layerSpacing + paddingH * 2;
+      const newHeight = maxColumnHeight + headerHeight + paddingTop + paddingBottom;
+      
+      const currentWidth = (group.style as any)?.width || 0;
+      const currentHeight = (group.style as any)?.height || 0;
+      
+      // Check if group size needs update
+      if (Math.abs(newWidth - currentWidth) > 5 || Math.abs(newHeight - currentHeight) > 5) {
+        needsUpdate = true;
+        groupUpdates.set(group.id, { width: newWidth, height: newHeight });
+      }
+      
+      // Re-calculate child positions within each column
+      let currentX = paddingH;
+      columnLayouts.forEach(col => {
+        // Center this column vertically within the max height
+        let currentY = headerHeight + paddingTop + (maxColumnHeight - col.height) / 2;
+        
+        col.nodes.forEach(node => {
+          const h = (node.data as any)?.childrenExpanded ? nodeHeightExpanded : nodeHeight;
+          
+          // Check if position needs update
+          if (Math.abs(node.position.x - currentX) > 1 || Math.abs(node.position.y - currentY) > 1) {
+            needsUpdate = true;
+            childPositionUpdates.set(node.id, { x: currentX, y: currentY });
+          }
+          
+          currentY += h + nodeSpacingV;
+        });
+        
+        currentX += nodeWidth + layerSpacing;
+      });
+    });
+    
+    if (needsUpdate) {
+      setRfNodes(prevNodes => 
+        prevNodes.map(node => {
+          // Update group dimensions
+          const groupUpdate = groupUpdates.get(node.id);
+          if (groupUpdate) {
+            return {
+              ...node,
+              style: {
+                ...node.style,
+                width: groupUpdate.width,
+                height: groupUpdate.height,
+              },
+              data: {
+                ...node.data,
+                width: groupUpdate.width,
+                height: groupUpdate.height,
+              },
+            };
+          }
+          
+          // Update child positions
+          const positionUpdate = childPositionUpdates.get(node.id);
+          if (positionUpdate) {
+            return {
+              ...node,
+              position: positionUpdate,
+            };
+          }
+          
+          return node;
+        }) as any
+      );
+    }
+  }, [sourceGroupsEnabled, setRfNodes]);
+
+  // Update group dimensions when child nodes change size (e.g., columns expanded)
+  const childNodesHash = useMemo(() => {
+    const childNodes = rfNodes.filter(n => n.parentId?.startsWith('source-group-'));
+    return childNodes.map(n => 
+      `${n.id}:${(n.data as any)?.childrenExpanded ? 'exp' : 'col'}`
+    ).join('|');
+  }, [rfNodes]);
+
+  useEffect(() => {
+    if (childNodesHash && sourceGroupsEnabled) {
+      updateGroupDimensions();
+    }
+  }, [childNodesHash, sourceGroupsEnabled, updateGroupDimensions]);
   
   // Refs for column lineage state (used in applyAutoLayout)
   const selectedColumnLineageRef = useRef(selectedColumnLineage);
@@ -475,15 +1087,22 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
           const draggedNode = rfNodes.find(n => n.id === change.id);
           if (!draggedNode) return;
           
+          // Skip if this node has a parent - React Flow handles parent-child dragging
+          if ((draggedNode as any).parentId) return;
+          
           const deltaX = change.position.x - draggedNode.position.x;
           const deltaY = change.position.y - draggedNode.position.y;
           
-          // Apply the same delta to all other selected nodes
+          // Apply the same delta to all other selected nodes that don't have a parent
+          // Nodes with parentId are moved automatically by React Flow when their parent moves
           const groupChanges = Array.from(selectedNodeIds)
             .filter(nodeId => nodeId !== change.id) // Exclude the node being dragged
             .map(nodeId => {
               const node = rfNodes.find(n => n.id === nodeId);
               if (!node) return null;
+              
+              // Skip child nodes - React Flow handles their position relative to parent
+              if ((node as any).parentId) return null;
               
               return {
                 id: nodeId,
@@ -841,19 +1460,50 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
   }, []);
 
   const tidyUpNodes = useCallback(async () => {
-    // Get all currently visible nodes
-    const currentNodes = rfNodes.filter(node => visibleNodeIds.has(node.id));
+    // Include source groups in layout, exclude child nodes (they stay with parents)
+    const childNodeIds = new Set(rfNodes.filter(n => n.parentId).map(n => n.id));
+    
+    const currentNodes = rfNodes.filter(node => {
+      // Include source groups
+      if (node.id.startsWith('source-group-')) return true;
+      // Include non-child visible nodes
+      return visibleNodeIds.has(node.id) && !childNodeIds.has(node.id);
+    });
+    
+    // Remap edges from children to their parent groups
     const currentEdges = rfEdges.filter(edge => 
       visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
-    );
+    ).map(edge => {
+      const sourceNode = rfNodes.find(n => n.id === edge.source);
+      const targetNode = rfNodes.find(n => n.id === edge.target);
+      return {
+        ...edge,
+        source: sourceNode?.parentId || edge.source,
+        target: targetNode?.parentId || edge.target,
+      };
+    }).filter(edge => edge.source !== edge.target);
     
     if (currentNodes.length === 0) return;
     
+    // Add dimensions to nodes
+    const nodesWithDimensions = currentNodes.map(node => {
+      if (node.id.startsWith('source-group-')) {
+        return {
+          ...node,
+          width: (node.style as any)?.width || 400,
+          height: (node.style as any)?.height || 300,
+        };
+      }
+      return {
+        ...node,
+        width: 280,
+        height: (node.data as any)?.childrenExpanded ? 440 : 160,
+      };
+    });
+    
     try {
-      // Apply ELK layout to reorganize current visible nodes
-      const laidOutNodes = await elkLayout(currentNodes as any, currentEdges as any, 'RIGHT');
+      const laidOutNodes = await elkLayout(nodesWithDimensions as any, currentEdges as any, 'RIGHT');
       
-      // Update positions of the laid out nodes while preserving other node data
       setRfNodes(prevNodes => 
         prevNodes.map(node => {
           const laidOutNode = laidOutNodes.find(ln => ln.id === node.id);
@@ -861,7 +1511,6 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
         })
       );
       
-      // Pan to center nodes without changing zoom (keep at 100%)
       setTimeout(() => fitView({ padding: 0.15, duration: 300, minZoom: 1, maxZoom: 1 }), 100);
     } catch (error) {
       console.error('Failed to tidy up nodes:', error);
@@ -903,18 +1552,49 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
       
       isLayoutInProgressRef.current = true;
       
-      // Get current nodes with measured dimensions from DOM
-      const currentNodes = nodesRef.current.filter(node => 
-        visibleNodeIds.has(node.id) || (node.data as any).isGroupNode
-      );
+      const allNodes = nodesRef.current;
       
-      // Get base edges
-      const baseEdges = edgesRef.current.filter(edge => 
-        (visibleNodeIds.has(edge.source) || edge.source.includes('-group-')) && 
-        (visibleNodeIds.has(edge.target) || edge.target.includes('-group-'))
-      );
+      // Get child node IDs (nodes that have a parent)
+      const childNodeIds = new Set(allNodes.filter(n => n.parentId).map(n => n.id));
       
-      // Include column lineage edges for layout (so ELK knows about node relationships)
+      // For layout: include source groups (as large nodes) and non-child regular nodes
+      // Children stay inside their groups with relative positions
+      const currentNodes = allNodes.filter(node => {
+        // Include source groups
+        if (node.id.startsWith('source-group-')) return true;
+        // Include regular nodes that are not children of groups
+        if ((visibleNodeIds.has(node.id) || (node.data as any).isGroupNode) && !childNodeIds.has(node.id)) {
+          return true;
+        }
+        return false;
+      });
+      
+      // Get base edges - remap edges from/to child nodes to their parent groups
+      const baseEdges = edgesRef.current.filter(edge => {
+        const sourceInLayout = currentNodes.some(n => n.id === edge.source);
+        const targetInLayout = currentNodes.some(n => n.id === edge.target);
+        
+        // Also check if source/target are children - find their parent group
+        const sourceNode = allNodes.find(n => n.id === edge.source);
+        const targetNode = allNodes.find(n => n.id === edge.target);
+        const sourceParent = sourceNode?.parentId;
+        const targetParent = targetNode?.parentId;
+        
+        // If both are in layout directly, or have parent groups
+        return (sourceInLayout || sourceParent) && (targetInLayout || targetParent);
+      }).map(edge => {
+        // Remap edges from children to their parent groups for layout purposes
+        const sourceNode = allNodes.find(n => n.id === edge.source);
+        const targetNode = allNodes.find(n => n.id === edge.target);
+        
+        return {
+          ...edge,
+          source: sourceNode?.parentId || edge.source,
+          target: targetNode?.parentId || edge.target,
+        };
+      }).filter(edge => edge.source !== edge.target); // Remove self-loops (edges within same group)
+      
+      // Include column lineage edges for layout
       const columnLineageEdges = createColumnLineageEdges(
         selectedColumnLineageRef.current, 
         hoveredColumnLineageRef.current
@@ -922,7 +1602,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
         visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
       );
       
-      // Combine and deduplicate edges by source-target pair (ELK only needs node relationships)
+      // Combine and deduplicate edges
       const edgePairs = new Set(baseEdges.map(e => `${e.source}->${e.target}`));
       const uniqueColumnEdges = columnLineageEdges.filter(e => !edgePairs.has(`${e.source}->${e.target}`));
       const currentEdges = [...baseEdges, ...uniqueColumnEdges];
@@ -934,17 +1614,18 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
       
       // Calculate node dimensions for layout
       const nodesWithDimensions = currentNodes.map(node => {
+        // Source groups use their actual dimensions
+        if (node.id.startsWith('source-group-')) {
+          const width = (node.style as any)?.width || 400;
+          const height = (node.style as any)?.height || 300;
+          return { ...node, width, height };
+        }
+        
         const hasExpandedColumns = (node.data as any)?.childrenExpanded === true;
-        
-        // Use fixed heights: 400px for expanded (max height), 160px for collapsed
         const height = hasExpandedColumns ? 440 : 160;
-        const width = 280; // Standard card width
+        const width = 280;
         
-        return {
-          ...node,
-          width,
-          height,
-        };
+        return { ...node, width, height };
       });
       
       try {
@@ -1226,7 +1907,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
               const normalNodeIds = toAdd.slice(0, SHOW_NORMAL);
               const groupedNodeIds = toAdd.slice(SHOW_NORMAL);
               
-              // Create normal nodes
+              // Create normal nodes - start hidden for smooth reveal after layout
               const positions = placeNeighbors(parent, SHOW_NORMAL + 1, dir); // +1 for group node
               normalNodeIds.forEach((id, i) => {
                 const base = ALL_NODE_BY_ID.get(id)!;
@@ -1234,7 +1915,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
                   ...base,
                   upstreamExpanded: false,
                   downstreamExpanded: false,
-                });
+                }, { hidden: true }); // Always hide initially for smooth transition
                 rf.position = positions[i];
                 newNodes.push(rf);
               });
@@ -1244,9 +1925,11 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
               const groupedNodes = groupedNodeIds.map(id => ALL_NODE_BY_ID.get(id)!);
               
               // Create a group node that looks like a NodeCard but contains mini cards
+              // Start hidden for smooth reveal after layout
               const groupNode: Node<NodeCardData> = {
                 id: groupNodeId,
                 type: 'lineage',
+                style: { opacity: 0 }, // Start hidden for smooth transition
                 data: {
                   id: groupNodeId,
                   name: groupNodeId,
@@ -1300,13 +1983,13 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
                     // Recalculate positions for all siblings including group
                     const newPositions = placeNeighbors(parent, totalAfterPromotion, dir);
                     
-                    // Create the promoted node
+                    // Create the promoted node - start hidden for smooth reveal after layout
                     const promotedNode = ALL_NODE_BY_ID.get(promotedNodeId)!;
                     const rf = makeRfNode({
                       ...promotedNode,
                       upstreamExpanded: false,
                       downstreamExpanded: false,
-                    });
+                    }, { hidden: true }); // Always hide initially for smooth transition
                     
                     // Update all nodes with new positions
                     setRfNodes((curr) => {
@@ -1366,13 +2049,85 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
                     });
                     
                     // Update edges - preserve existing edges and add new ones
+                    // Hide edges connecting to the promoted node for smooth reveal
                     setRfEdges((currentEdges) => {
                       const newEdges = buildRfEdges(updatedVisible);
                       // Merge with existing edges, avoiding duplicates
                       const edgeMap = new Map(currentEdges.map(e => [e.id, e]));
-                      newEdges.forEach(e => edgeMap.set(e.id, e));
+                      newEdges.forEach(e => {
+                        // Always hide edges to promoted node initially
+                        if (e.source === promotedNodeId || e.target === promotedNodeId) {
+                          edgeMap.set(e.id, { ...e, style: { ...e.style, opacity: 0 } });
+                        } else {
+                          edgeMap.set(e.id, e);
+                        }
+                      });
                       return Array.from(edgeMap.values()) as any;
                     });
+                    
+                    // Fade in promoted node and edges after layout settles
+                    setTimeout(() => {
+                      setRfNodes(prevNodes => 
+                        prevNodes.map(node => {
+                          if (node.id === promotedNodeId && (node.style as any)?.opacity === 0) {
+                            return {
+                              ...node,
+                              style: {
+                                ...node.style,
+                                opacity: 1,
+                                transition: 'opacity 0.15s ease-out',
+                              },
+                            };
+                          }
+                          return node;
+                        }) as any
+                      );
+                      
+                      setRfEdges(prevEdges => 
+                        prevEdges.map(edge => {
+                          if ((edge.style as any)?.opacity === 0) {
+                            return {
+                              ...edge,
+                              style: {
+                                ...edge.style,
+                                opacity: 1,
+                                transition: 'opacity 0.15s ease-out',
+                              },
+                            };
+                          }
+                          return edge;
+                        })
+                      );
+                      
+                      // Clean up transitions
+                      setTimeout(() => {
+                        setRfNodes(prevNodes => 
+                          prevNodes.map(node => {
+                            if (node.id === promotedNodeId && (node.style as any)?.transition) {
+                              const { transition, ...restStyle } = node.style as any;
+                              return {
+                                ...node,
+                                style: Object.keys(restStyle).length > 0 ? restStyle : undefined,
+                              };
+                            }
+                            return node;
+                          }) as any
+                        );
+                        
+                        setRfEdges(prevEdges => 
+                          prevEdges.map(edge => {
+                            if ((edge.style as any)?.transition) {
+                              const { transition, ...restStyle } = edge.style as any;
+                              return {
+                                ...edge,
+                                style: Object.keys(restStyle).length > 0 ? restStyle : undefined,
+                              };
+                            }
+                            return edge;
+                          })
+                        );
+                      }, 200);
+                    }, 350); // Longer delay to let positioning fully complete before reveal
                   },
                 } as any,
                 position: positions[SHOW_NORMAL],
@@ -1384,7 +2139,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
               // Also add group node to visible set so edges can connect to it
               currentVisible.add(groupNodeId);
             } else {
-              // Original logic for <= 10 nodes
+              // Original logic for <= 10 nodes - start hidden for smooth reveal after layout
               const positions = placeNeighbors(parent, toAdd.length, dir);
               newNodes = toAdd.map((id, i) => {
                 const base = ALL_NODE_BY_ID.get(id)!;
@@ -1392,7 +2147,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
                   ...base,
                   upstreamExpanded: false,
                   downstreamExpanded: false,
-                });
+                }, { hidden: true }); // Always hide initially for smooth transition
                 rf.position = positions[i];
                 return rf;
               });
@@ -1438,9 +2193,18 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
             );
             const edges = buildRfEdges(currentVisible);
             // Merge with existing edges to preserve edges from promoted nodes
+            // Hide all edges connecting to hidden nodes for smooth reveal
+            const hiddenNodeIds = new Set(newNodes.filter(n => (n.style as any)?.opacity === 0).map(n => n.id));
             setRfEdges((currentEdges) => {
               const edgeMap = new Map(currentEdges.map(e => [e.id, e]));
-              edges.forEach(e => edgeMap.set(e.id, e));
+              edges.forEach(e => {
+                // If edge connects to a hidden node, start it hidden too
+                if (hiddenNodeIds.has(e.source) || hiddenNodeIds.has(e.target)) {
+                  edgeMap.set(e.id, { ...e, style: { ...e.style, opacity: 0 } });
+                } else {
+                  edgeMap.set(e.id, e);
+                }
+              });
               return Array.from(edgeMap.values()) as any;
             });
             
@@ -1448,6 +2212,73 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
             // This creates a bounding box around all "focused" elements
             const focusedNodeIds = [nodeId, ...newNodes.map(n => n.id)];
             scheduleCentering(focusedNodeIds, [], [], 250);
+            
+            // Fade in hidden nodes and edges after layout settles
+            // Use a delay to let centering/layout complete first
+            setTimeout(() => {
+              // Fade in nodes
+              setRfNodes(prevNodes => 
+                prevNodes.map(node => {
+                  if (hiddenNodeIds.has(node.id)) {
+                    return {
+                      ...node,
+                      style: {
+                        ...node.style,
+                        opacity: 1,
+                        transition: 'opacity 0.15s ease-out',
+                      },
+                    };
+                  }
+                  return node;
+                }) as any
+              );
+              
+              // Fade in edges
+              setRfEdges(prevEdges => 
+                prevEdges.map(edge => {
+                  if ((edge.style as any)?.opacity === 0) {
+                    return {
+                      ...edge,
+                      style: {
+                        ...edge.style,
+                        opacity: 1,
+                        transition: 'opacity 0.15s ease-out',
+                      },
+                    };
+                  }
+                  return edge;
+                })
+              );
+              
+              // Clean up transition styles after animation
+              setTimeout(() => {
+                setRfNodes(prevNodes => 
+                  prevNodes.map(node => {
+                    if (hiddenNodeIds.has(node.id) && (node.style as any)?.transition) {
+                      const { transition, ...restStyle } = node.style as any;
+                      return {
+                        ...node,
+                        style: Object.keys(restStyle).length > 0 ? restStyle : undefined,
+                      };
+                    }
+                    return node;
+                  }) as any
+                );
+                
+                setRfEdges(prevEdges => 
+                  prevEdges.map(edge => {
+                    if ((edge.style as any)?.transition) {
+                      const { transition, ...restStyle } = edge.style as any;
+                      return {
+                        ...edge,
+                        style: Object.keys(restStyle).length > 0 ? restStyle : undefined,
+                      };
+                    }
+                    return edge;
+                  })
+                );
+              }, 200);
+            }, 350); // Longer delay to let positioning fully complete before reveal
           },
         },
       );
@@ -2188,8 +3019,141 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
   }, [selectedNodeIds, setRfNodes, applyAutoLayout]);
 
   const handleGroupNodes = useCallback(() => {
-    // TODO: Implement node grouping functionality
-  }, [selectedNodeIds]);
+    if (selectedNodeIds.size < 2) {
+      console.log('Need at least 2 nodes to create a group');
+      return;
+    }
+
+    const selectedNodes = rfNodes.filter(n => selectedNodeIds.has(n.id));
+    if (selectedNodes.length < 2) return;
+
+    // Calculate bounding box of selected nodes
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    selectedNodes.forEach(node => {
+      const nodeAny = node as any;
+      const width = nodeAny.measured?.width || node.width || 280;
+      const height = nodeAny.measured?.height || node.height || 160;
+      
+      minX = Math.min(minX, node.position.x);
+      minY = Math.min(minY, node.position.y);
+      maxX = Math.max(maxX, node.position.x + width);
+      maxY = Math.max(maxY, node.position.y + height);
+    });
+
+    // Add padding around the group
+    const padding = 40;
+    const headerHeight = 50; // Account for group header
+    const groupWidth = maxX - minX + padding * 2;
+    const groupHeight = maxY - minY + padding * 2 + headerHeight;
+    const groupX = minX - padding;
+    const groupY = minY - padding - headerHeight;
+
+    // Generate unique group ID
+    const groupId = `group-${Date.now()}`;
+
+    // Create the group node
+    const groupNode: Node<any> = {
+      id: groupId,
+      type: 'group',
+      position: { x: groupX, y: groupY },
+      style: {
+        width: groupWidth,
+        height: groupHeight,
+      },
+      data: {
+        id: groupId,
+        name: groupId,
+        label: `Group (${selectedNodes.length} nodes)`,
+        objType: 'GROUP' as const,
+        description: 'Grouped nodes',
+        color: 'blue',
+        width: groupWidth,
+        height: groupHeight,
+        isCollapsed: false,
+        onResize: (width: number, height: number) => handleGroupResize(groupId, width, height),
+        onToggleCollapse: () => handleGroupToggleCollapse(groupId),
+        onRemoveGroup: () => handleUngroupNodes(groupId),
+      },
+      // Group nodes should render behind children
+      zIndex: -1,
+    };
+
+    // Update child nodes to reference the parent
+    const updatedNodes = rfNodes.map(node => {
+      if (selectedNodeIds.has(node.id)) {
+        // Calculate position relative to group
+        const relativeX = node.position.x - groupX;
+        const relativeY = node.position.y - groupY;
+        
+        return {
+          ...node,
+          position: { x: relativeX, y: relativeY },
+          parentId: groupId,
+          extent: 'parent' as const,
+          expandParent: true,
+          // Increase zIndex so children render above parent
+          zIndex: 1,
+        };
+      }
+      return node;
+    });
+
+    // Add the group node at the beginning (so it renders first/behind)
+    setRfNodes([groupNode, ...updatedNodes]);
+
+    // Add group to visible nodes
+    setVisibleNodeIds(prev => {
+      const next = new Set(prev);
+      next.add(groupId);
+      return next;
+    });
+
+    // Clear selection after grouping
+    setSelectedNodeId(null);
+    setSelectedNodeIds(new Set());
+    setSelectedChildrenByNode({});
+
+    console.log('Created group:', groupId, 'with nodes:', Array.from(selectedNodeIds));
+  }, [selectedNodeIds, rfNodes, setRfNodes, setVisibleNodeIds, handleGroupResize, handleGroupToggleCollapse]);
+
+  // Ungroup nodes - remove parent-child relationship
+  const handleUngroupNodes = useCallback((groupId: string) => {
+    const groupNode = rfNodes.find(n => n.id === groupId);
+    if (!groupNode) return;
+
+    // Find all child nodes of this group
+    const childNodes = rfNodes.filter(n => n.parentId === groupId);
+    
+    // Update nodes: convert relative positions back to absolute and remove parent reference
+    const updatedNodes = rfNodes
+      .filter(n => n.id !== groupId) // Remove the group node
+      .map(node => {
+        if (node.parentId === groupId) {
+          // Convert back to absolute position
+          const absoluteX = groupNode.position.x + node.position.x;
+          const absoluteY = groupNode.position.y + node.position.y;
+          
+          // Remove parent reference
+          const { parentId, extent, expandParent, zIndex, ...rest } = node as any;
+          return {
+            ...rest,
+            position: { x: absoluteX, y: absoluteY },
+          };
+        }
+        return node;
+      });
+
+    setRfNodes(updatedNodes);
+
+    // Remove group from visible nodes
+    setVisibleNodeIds(prev => {
+      const next = new Set(prev);
+      next.delete(groupId);
+      return next;
+    });
+
+    console.log('Ungrouped:', groupId, 'released nodes:', childNodes.map(n => n.id));
+  }, [rfNodes, setRfNodes, setVisibleNodeIds]);
 
   const handleDropNodes = useCallback(() => {
     // TODO: Implement node removal functionality
@@ -2774,6 +3738,14 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
                   }}
                 >
                   {autoLayoutEnabled ? 'Auto Layout: On' : 'Auto Layout: Off'}
+                </Button>
+                <Button 
+                  variant="secondary"
+                  size="md"
+                  level="reactflow"
+                  onClick={() => setSourceGroupsEnabled(!sourceGroupsEnabled)}
+                >
+                  {sourceGroupsEnabled ? 'Source Groups: On' : 'Source Groups: Off'}
                 </Button>
                 {!autoLayoutEnabled && (
                   <Button 

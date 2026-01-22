@@ -74,6 +74,12 @@ export function ContextualActionBar({
         size="sm"
         level="reactflow"
         onClick={onGroupNodes}
+        disabled={selectedCount < 2}
+        title={selectedCount < 2 ? 'Select at least 2 nodes to group' : 'Group selected nodes'}
+        style={{
+          opacity: selectedCount < 2 ? 0.5 : 1,
+          cursor: selectedCount < 2 ? 'not-allowed' : 'pointer',
+        }}
       >
         Group
       </Button>

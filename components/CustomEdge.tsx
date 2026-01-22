@@ -78,6 +78,10 @@ export function CustomEdge({
   // Don't show labels for column edges or if no special treatment needed
   const shouldShowLabel = !isColumnEdge && specialEdge;
 
+  // Get opacity from style (for fade-in/fade-out animations)
+  const opacity = (style as any)?.opacity;
+  const transition = (style as any)?.transition;
+
   // Only apply custom styling for special edge types (not selected state - let CSS handle that)
   // Selected state styling is handled by CSS (.react-flow__edge.selected)
   const edgeStyle = {
@@ -98,6 +102,9 @@ export function CustomEdge({
             className="edge-label-container nodrag nopan"
             style={{
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              // Inherit opacity and transition from edge style for smooth fade animations
+              ...(opacity !== undefined ? { opacity } : {}),
+              ...(transition ? { transition } : {}),
             }}
           >
             <div

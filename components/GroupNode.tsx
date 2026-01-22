@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Handle, Position, NodeToolbar, NodeResizer } from 'reactflow';
+import { useState, useEffect } from 'react';
+import { Handle, Position, NodeToolbar, NodeResizer, useReactFlow } from 'reactflow';
 
 export type GroupNodeData = {
   id: string;
@@ -12,6 +12,7 @@ export type GroupNodeData = {
   isCollapsed?: boolean;
   width?: number;
   height?: number;
+  childCount?: number;
   onToggleCollapse?: () => void;
   onPromoteNode?: (nodeId: string) => void;
   onSelectNode?: () => void;
@@ -52,12 +53,21 @@ const colorThemes = {
   },
 };
 
-function GroupNodeCard({ data, selected }: { data: GroupNodeData; selected?: boolean }) {
+function GroupNodeCard({ data, selected, id }: { data: GroupNodeData; selected?: boolean; id: string }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isToolbarHovered, setIsToolbarHovered] = useState(false);
   const [hoverTimeout, setHoverTimeout] = useState<number | null>(null);
+  const [childCount, setChildCount] = useState(0);
+  const { getNodes } = useReactFlow();
 
   const theme = colorThemes[data.color as keyof typeof colorThemes] || colorThemes.blue;
+
+  // Count child nodes
+  useEffect(() => {
+    const nodes = getNodes();
+    const children = nodes.filter(n => n.parentId === id);
+    setChildCount(children.length);
+  }, [getNodes, id]);
 
   const handleMouseEnter = () => {
     if (hoverTimeout) {
@@ -231,21 +241,26 @@ function GroupNodeCard({ data, selected }: { data: GroupNodeData; selected?: boo
         </div>
       </NodeToolbar>
 
-      {/* Group Node Container - This is the actual group node */}
+      {/* Group Node Container - Uses 100% to fill React Flow's managed dimensions */}
       <div 
         className="group-node-container"
         style={{
           background: theme.background,
-          border: `2px solid ${theme.border}`,
+          border: `2px solid ${selected ? '#1A6CE7' : theme.border}`,
           borderRadius: '8px',
-          width: data.width || 300,
-          height: data.height || 200,
+          width: '100%',
+          height: '100%',
+          minWidth: 200,
+          minHeight: 100,
           cursor: 'move',
           position: 'relative',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+          boxShadow: selected 
+            ? '0 0 0 2px rgba(26, 108, 231, 0.3), 0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+            : '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden',
+          overflow: 'visible', // Allow child nodes to be visible
+          boxSizing: 'border-box',
         }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -277,15 +292,16 @@ function GroupNodeCard({ data, selected }: { data: GroupNodeData; selected?: boo
           }}
         />
         
-        {/* Header */}
+        {/* Header - positioned at top of group */}
         <div style={{
-          padding: 12,
+          padding: '8px 12px',
           borderBottom: `1px solid ${theme.border}`,
           background: theme.header,
           display: 'flex',
           alignItems: 'center',
           gap: 8,
           flexShrink: 0,
+          borderRadius: '6px 6px 0 0',
         }}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style={{ color: theme.text }}>
             <path fillRule="evenodd" clipRule="evenodd" d="M2 3C2 2.44772 2.44772 2 3 2H13C13.5523 2 14 2.44772 14 3V13C14 13.5523 13.5523 14 13 14H3C2.44772 14 2 13.5523 2 13V3ZM3 3V13H13V3H3Z" />
@@ -301,6 +317,18 @@ function GroupNodeCard({ data, selected }: { data: GroupNodeData; selected?: boo
           }}>
             {data.label || 'Group'}
           </span>
+          {childCount > 0 && (
+            <div style={{
+              fontSize: '12px',
+              color: theme.text,
+              opacity: 0.7,
+              background: theme.background,
+              padding: '2px 8px',
+              borderRadius: '10px',
+            }}>
+              {childCount} node{childCount !== 1 ? 's' : ''}
+            </div>
+          )}
           {data.isCollapsed && (
             <div style={{
               fontSize: '12px',
@@ -312,28 +340,30 @@ function GroupNodeCard({ data, selected }: { data: GroupNodeData; selected?: boo
           )}
         </div>
         
-        {/* Content Area - This is where child nodes will be rendered */}
+        {/* Content Area - Child nodes are rendered by React Flow on top of this */}
         <div style={{
           flex: 1,
           padding: 12,
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden',
+          overflow: 'visible',
           position: 'relative',
+          pointerEvents: 'none', // Allow clicks to pass through to child nodes
         }}>
-          {data.description && (
+          {data.description && childCount === 0 && (
             <div style={{
               fontSize: '12px',
               color: theme.text,
               opacity: 0.8,
               marginBottom: 8,
               lineHeight: 1.4,
+              pointerEvents: 'auto',
             }}>
               {data.description}
             </div>
           )}
           
-          {!data.isCollapsed && (
+          {!data.isCollapsed && childCount === 0 && (
             <div style={{
               flex: 1,
               display: 'flex',
@@ -347,8 +377,9 @@ function GroupNodeCard({ data, selected }: { data: GroupNodeData; selected?: boo
               borderRadius: '4px',
               padding: '16px',
               textAlign: 'center',
+              pointerEvents: 'auto',
             }}>
-              Drop nodes here to group them
+              Select nodes and click "Group" to add them here
             </div>
           )}
         </div>

@@ -1,6 +1,58 @@
-import type { LineageEdge, LineageNode, ObjType, ColumnLineageEdge, ColumnMetadata } from './types';
+import type { LineageEdge, LineageNode, ObjType, ColumnLineageEdge, ColumnMetadata, DataSource } from './types';
 
 type RelEdge = LineageEdge;
+
+// Define data sources for visual grouping
+export const DATA_SOURCES: Record<string, DataSource> = {
+  databricks: {
+    id: 'databricks',
+    name: 'DATABRICKS',
+    type: 'SelectStar connector',
+    icon: 'icons/databricks-logo.png',
+    isExternal: true,
+  },
+  salesforce: {
+    id: 'salesforce',
+    name: 'SALESFORCE',
+    type: 'CRM connector',
+    icon: 'icons/salesforce-logo.png',
+    isExternal: true,
+  },
+  stripe: {
+    id: 'stripe',
+    name: 'STRIPE',
+    type: 'Payment connector',
+    icon: 'icons/stripe-logo.png',
+    isExternal: true,
+  },
+  snowhouse: {
+    id: 'snowhouse',
+    name: 'SNOWHOUSE',
+    type: 'Snowflake account',
+    isExternal: false, // Internal - another Snowflake account
+  },
+  powerbi: {
+    id: 'powerbi',
+    name: 'POWER BI',
+    type: 'BI connector',
+    icon: 'icons/powerbi-logo.svg',
+    isExternal: true,
+  },
+  tableau: {
+    id: 'tableau',
+    name: 'TABLEAU',
+    type: 'BI connector',
+    icon: 'icons/tableau-logo.svg',
+    isExternal: true,
+  },
+  looker: {
+    id: 'looker',
+    name: 'LOOKER',
+    type: 'BI connector',
+    icon: 'icons/looker-logo.png',
+    isExternal: true,
+  },
+};
 
 function n(
   id: string, 
@@ -12,7 +64,8 @@ function n(
   warning?: string | string[],
   children?: Array<{ name: string; type: string }>,
   brandIcon?: string,
-  columnsMetadata?: ColumnMetadata[]
+  columnsMetadata?: ColumnMetadata[],
+  source?: DataSource
 ): LineageNode {
   return { 
     id, 
@@ -27,7 +80,8 @@ function n(
     warning,
     children,
     brandIcon,
-    columnsMetadata
+    columnsMetadata,
+    source
   };
 }
 function e(source: string, target: string, relation?: string): RelEdge {
@@ -76,27 +130,99 @@ function col(
 }
 
 export const ALL_NODES: LineageNode[] = [
-  // External upstream data sources
-  n('EXT.DATABRICKS.CUSTOMER_DATA', 'Customer Analytics', 'EXT_TABLE', undefined, '2024-01-01', undefined, undefined, [
-    { name: 'customer_segments', type: 'VARCHAR' },
+  // ========================================
+  // DATABRICKS GROUP - External lineage with internal 2-3 depth pipeline
+  // ========================================
+  // Depth 1: Raw data sources in Databricks
+  n('EXT.DATABRICKS.RAW_CLICKSTREAM', 'Raw Clickstream', 'EXT_TABLE', undefined, '2024-01-01', undefined, undefined, [
+    { name: 'event_id', type: 'VARCHAR' },
+    { name: 'user_id', type: 'VARCHAR' },
+    { name: 'page_url', type: 'VARCHAR' },
+    { name: 'timestamp', type: 'TIMESTAMP' }
+  ], 'icons/databricks-logo.png', undefined, DATA_SOURCES.databricks),
+  n('EXT.DATABRICKS.RAW_TRANSACTIONS', 'Raw Transactions', 'EXT_TABLE', undefined, '2024-01-01', undefined, undefined, [
+    { name: 'txn_id', type: 'VARCHAR' },
+    { name: 'user_id', type: 'VARCHAR' },
+    { name: 'amount', type: 'DECIMAL' },
+    { name: 'txn_date', type: 'TIMESTAMP' }
+  ], 'icons/databricks-logo.png', undefined, DATA_SOURCES.databricks),
+  // Depth 2: Processed/transformed in Databricks
+  n('EXT.DATABRICKS.USER_BEHAVIOR', 'User Behavior', 'EXT_TABLE', undefined, '2024-01-01', undefined, undefined, [
+    { name: 'user_id', type: 'VARCHAR' },
+    { name: 'session_count', type: 'INTEGER' },
+    { name: 'avg_session_duration', type: 'DECIMAL' },
+    { name: 'last_activity', type: 'TIMESTAMP' }
+  ], 'icons/databricks-logo.png', undefined, DATA_SOURCES.databricks),
+  // Depth 3: Final aggregated output from Databricks
+  n('EXT.DATABRICKS.CUSTOMER_360', 'Customer 360', 'EXT_TABLE', undefined, '2024-01-01', undefined, undefined, [
+    { name: 'customer_id', type: 'VARCHAR' },
     { name: 'lifetime_value', type: 'DECIMAL' },
     { name: 'churn_probability', type: 'DECIMAL' },
-    { name: 'last_activity', type: 'TIMESTAMP' }
-  ], 'icons/databricks-logo.png'),
-  n('EXT.SALESFORCE.LEADS', 'Salesforce Leads', 'EXT_STAGE', undefined, '2024-01-01', undefined, undefined, [
+    { name: 'segment', type: 'VARCHAR' }
+  ], 'icons/databricks-logo.png', undefined, DATA_SOURCES.databricks),
+
+  // ========================================
+  // SALESFORCE GROUP - External CRM lineage with internal pipeline
+  // ========================================
+  // Depth 1: Raw Salesforce objects
+  n('EXT.SALESFORCE.ACCOUNTS', 'Accounts', 'EXT_TABLE', undefined, '2024-01-01', undefined, undefined, [
+    { name: 'account_id', type: 'VARCHAR' },
+    { name: 'account_name', type: 'VARCHAR' },
+    { name: 'industry', type: 'VARCHAR' },
+    { name: 'created_date', type: 'TIMESTAMP' }
+  ], 'icons/salesforce-logo.png', undefined, DATA_SOURCES.salesforce),
+  n('EXT.SALESFORCE.CONTACTS', 'Contacts', 'EXT_TABLE', undefined, '2024-01-01', undefined, undefined, [
+    { name: 'contact_id', type: 'VARCHAR' },
+    { name: 'account_id', type: 'VARCHAR' },
+    { name: 'email', type: 'VARCHAR' },
+    { name: 'phone', type: 'VARCHAR' }
+  ], 'icons/salesforce-logo.png', undefined, DATA_SOURCES.salesforce),
+  n('EXT.SALESFORCE.OPPORTUNITIES', 'Opportunities', 'EXT_TABLE', undefined, '2024-01-01', undefined, undefined, [
+    { name: 'opp_id', type: 'VARCHAR' },
+    { name: 'account_id', type: 'VARCHAR' },
+    { name: 'amount', type: 'DECIMAL' },
+    { name: 'stage', type: 'VARCHAR' }
+  ], 'icons/salesforce-logo.png', undefined, DATA_SOURCES.salesforce),
+  // Depth 2: Joined/enriched Salesforce data
+  n('EXT.SALESFORCE.LEADS_ENRICHED', 'Leads Enriched', 'EXT_TABLE', undefined, '2024-01-01', undefined, undefined, [
     { name: 'lead_id', type: 'VARCHAR' },
     { name: 'company', type: 'VARCHAR' },
     { name: 'email', type: 'VARCHAR' },
-    { name: 'status', type: 'VARCHAR' },
-    { name: 'created_date', type: 'TIMESTAMP' }
-  ], 'icons/salesforce-logo.png'),
+    { name: 'score', type: 'INTEGER' },
+    { name: 'status', type: 'VARCHAR' }
+  ], 'icons/salesforce-logo.png', undefined, DATA_SOURCES.salesforce),
+
+  // ========================================
+  // SNOWHOUSE GROUP - Internal Snowflake account (upstream of CUSTOMERS_RAW)
+  // ========================================
+  n('SNOWHOUSE.RAW.USER_PROFILES', 'User Profiles', 'TABLE', 4, '2024-01-01', undefined, undefined, [
+    { name: 'user_id', type: 'VARCHAR' },
+    { name: 'first_name', type: 'VARCHAR' },
+    { name: 'last_name', type: 'VARCHAR' },
+    { name: 'email', type: 'VARCHAR' }
+  ], undefined, undefined, DATA_SOURCES.snowhouse),
+  n('SNOWHOUSE.RAW.USER_PREFERENCES', 'User Preferences', 'TABLE', 4, '2024-01-01', undefined, undefined, [
+    { name: 'user_id', type: 'VARCHAR' },
+    { name: 'preference_key', type: 'VARCHAR' },
+    { name: 'preference_value', type: 'VARCHAR' }
+  ], undefined, undefined, DATA_SOURCES.snowhouse),
+  n('SNOWHOUSE.STAGING.CUSTOMERS_MERGED', 'Customers Merged', 'TABLE', 5, '2024-01-01', undefined, undefined, [
+    { name: 'customer_id', type: 'VARCHAR' },
+    { name: 'full_name', type: 'VARCHAR' },
+    { name: 'email', type: 'VARCHAR' },
+    { name: 'preferences', type: 'JSON' }
+  ], undefined, undefined, DATA_SOURCES.snowhouse),
+
+  // ========================================
+  // STRIPE - External payment connector (single node)
+  // ========================================
   n('EXT.STRIPE.PAYMENTS', 'Stripe Payments', 'EXT_TABLE', undefined, '2024-01-01', undefined, undefined, [
     { name: 'payment_id', type: 'VARCHAR' },
     { name: 'customer_id', type: 'VARCHAR' },
     { name: 'amount', type: 'DECIMAL' },
     { name: 'currency', type: 'VARCHAR' },
     { name: 'status', type: 'VARCHAR' }
-  ], 'icons/stripe-logo.png'),
+  ], 'icons/stripe-logo.png', undefined, DATA_SOURCES.stripe),
 
   // Raw data tables - lower quality scores, some with warnings
   n('RAW.PUBLIC.ORDERS_RAW', 'ORDERS_RAW', 'TABLE', 2, '2024-01-10', undefined, ['Missing timestamps', 'Inconsistent date formats', 'Null values in required fields'], [
@@ -539,12 +665,40 @@ export const ALL_NODES: LineageNode[] = [
 ];
 
 export const ALL_EDGES: RelEdge[] = [
-  // External upstream connections
-  e('EXT.DATABRICKS.CUSTOMER_DATA', 'RAW.PUBLIC.CUSTOMERS_RAW', 'DATABRICKS_SYNC'),
-  e('EXT.SALESFORCE.LEADS', 'RAW.PUBLIC.CUSTOMERS_RAW', 'SALESFORCE_SYNC'),
+  // ========================================
+  // DATABRICKS internal lineage (within the group)
+  // ========================================
+  e('EXT.DATABRICKS.RAW_CLICKSTREAM', 'EXT.DATABRICKS.USER_BEHAVIOR', 'SPARK_JOB'),
+  e('EXT.DATABRICKS.RAW_TRANSACTIONS', 'EXT.DATABRICKS.USER_BEHAVIOR', 'SPARK_JOB'),
+  e('EXT.DATABRICKS.USER_BEHAVIOR', 'EXT.DATABRICKS.CUSTOMER_360', 'DBT_MODEL'),
+  // Databricks output to Snowflake
+  e('EXT.DATABRICKS.CUSTOMER_360', 'RAW.PUBLIC.CUSTOMERS_RAW', 'DATABRICKS_SYNC'),
+
+  // ========================================
+  // SALESFORCE internal lineage (within the group)
+  // ========================================
+  e('EXT.SALESFORCE.ACCOUNTS', 'EXT.SALESFORCE.LEADS_ENRICHED', 'FIVETRAN_SYNC'),
+  e('EXT.SALESFORCE.CONTACTS', 'EXT.SALESFORCE.LEADS_ENRICHED', 'FIVETRAN_SYNC'),
+  e('EXT.SALESFORCE.OPPORTUNITIES', 'EXT.SALESFORCE.LEADS_ENRICHED', 'FIVETRAN_SYNC'),
+  // Salesforce output to Snowflake
+  e('EXT.SALESFORCE.LEADS_ENRICHED', 'RAW.PUBLIC.CUSTOMERS_RAW', 'SALESFORCE_SYNC'),
+
+  // ========================================
+  // SNOWHOUSE internal lineage (within the group)
+  // ========================================
+  e('SNOWHOUSE.RAW.USER_PROFILES', 'SNOWHOUSE.STAGING.CUSTOMERS_MERGED', 'DBT_MODEL'),
+  e('SNOWHOUSE.RAW.USER_PREFERENCES', 'SNOWHOUSE.STAGING.CUSTOMERS_MERGED', 'DBT_MODEL'),
+  // Snowhouse output to main Snowflake (CUSTOMERS_RAW)
+  e('SNOWHOUSE.STAGING.CUSTOMERS_MERGED', 'RAW.PUBLIC.CUSTOMERS_RAW', 'CROSS_ACCOUNT_SHARE'),
+
+  // ========================================
+  // STRIPE to Snowflake
+  // ========================================
   e('EXT.STRIPE.PAYMENTS', 'RAW.PUBLIC.PAYMENTS_RAW', 'STRIPE_WEBHOOK'),
 
-  // Existing internal data flow
+  // ========================================
+  // Main Snowflake internal data flow
+  // ========================================
   e('RAW.PUBLIC.ORDERS_RAW', 'STG.PUBLIC.ORDERS_STG', 'FIVETRAN_SYNC'),
   e('RAW.PUBLIC.CUSTOMERS_RAW', 'STG.PUBLIC.CUSTOMERS_STG', 'FIVETRAN_SYNC'),
   e('RAW.PUBLIC.PRODUCTS_RAW', 'STG.PUBLIC.PRODUCTS_STG', 'COPY INTO'),

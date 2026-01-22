@@ -449,6 +449,11 @@ body {
   align-items: center;
 }
 
+/* Children of source groups have ALL-CAPS titles */
+.react-flow__node[data-parentid] .node-card-label {
+  text-transform: uppercase;
+}
+
 .node-card-actions {
   position: absolute;
   top: 0;
@@ -723,9 +728,10 @@ body {
 }
 
 /* Nodes: selected and focused nodes appear on top */
-.react-flow__node.selected,
-.react-flow__node.focused,
-.react-flow__node[data-focused="true"] {
+/* EXCLUDE source groups - they must stay behind their children */
+.react-flow__node.selected:not(.react-flow__node-sourceGroup),
+.react-flow__node.focused:not(.react-flow__node-sourceGroup),
+.react-flow__node[data-focused="true"]:not(.react-flow__node-sourceGroup) {
   z-index: 1000 !important;
 }
 
@@ -734,7 +740,8 @@ body {
   z-index: 999 !important;
 }
 
-.react-flow__node:hover {
+/* EXCLUDE source groups from hover z-index boost - they must stay behind children */
+.react-flow__node:hover:not(.react-flow__node-sourceGroup) {
   z-index: 999 !important;
 }
 
@@ -2004,4 +2011,129 @@ hr {
 
 .catalog-expand-icon.expanded {
   transform: rotate(90deg);
+}
+
+/* ============================================
+   Group Node Styles (React Flow Grouping)
+   ============================================ */
+
+/* Group node wrapper - ensures proper rendering as parent */
+.react-flow__node-group {
+  /* Don't clip children - they need to overflow the parent visually */
+  overflow: visible !important;
+  /* Ensure group is behind its children */
+  z-index: 0 !important;
+}
+
+/* Child nodes inside a group */
+.react-flow__node[data-parentid] {
+  /* Children should be above parent */
+  z-index: 1 !important;
+}
+
+/* Group node container styling */
+.group-node-container {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.group-node-container:hover {
+  border-color: #94a3b8 !important;
+}
+
+/* Group node handle styling */
+.group-node-handle {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.react-flow__node-group:hover .group-node-handle,
+.react-flow__node-group.selected .group-node-handle {
+  opacity: 1;
+}
+
+/* Group node selection indicator */
+.react-flow__node-group.selected .group-node-container {
+  border-color: #1A6CE7 !important;
+  box-shadow: 0 0 0 2px rgba(26, 108, 231, 0.3), 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Ensure child nodes are properly layered */
+.react-flow__node.react-flow__node-lineage[data-parentid] {
+  /* Keep children interactive */
+  pointer-events: all;
+}
+
+/* ============================================
+   Source Group Node Styles
+   ============================================ */
+
+/* Source group node - visual container for nodes from same source */
+.react-flow__node-sourceGroup {
+  /* Ensure group renders behind children */
+  z-index: -1 !important;
+  overflow: visible !important;
+}
+
+/* Source group container base */
+.source-group-node {
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* External source groups (Databricks, Salesforce, etc.) - Amber/Yellow */
+.source-group-node.external {
+  background: rgba(236, 183, 0, 0.07);
+}
+
+/* Hover effect only via JS on the header - not CSS :hover which triggers on wrapper */
+
+/* Internal source groups (other Snowflake accounts) - Blue */
+.source-group-node.internal {
+  background: rgba(178, 205, 247, 0.12);
+}
+
+/* Hover effect only via JS on the header - not CSS :hover which triggers on wrapper */
+
+/* Source group header styling */
+.source-group-header {
+  z-index: 10;
+}
+
+/* CRITICAL: Source group nodes MUST be behind child nodes */
+.react-flow__node-sourceGroup {
+  z-index: -1 !important;
+  pointer-events: none;
+}
+
+/* Only the header of source group should be interactive */
+.react-flow__node-sourceGroup .source-group-header {
+  pointer-events: all;
+}
+
+/* Selection state for source group */
+.react-flow__node-sourceGroup.selected .source-group-node.external {
+  box-shadow: inset 0 0 0 2px rgba(236, 183, 0, 0.4);
+}
+
+.react-flow__node-sourceGroup.selected .source-group-node.internal {
+  box-shadow: inset 0 0 0 2px rgba(178, 205, 247, 0.5);
+}
+
+/* Child nodes inside source group - MUST be above group background */
+.react-flow__node-lineage {
+  z-index: 1 !important;
+  pointer-events: all !important;
+}
+
+/* Ensure edges render above source groups but below nodes */
+.react-flow__edge {
+  z-index: 0;
+}
+
+/* Draggable source groups - drag via header only */
+.react-flow__node-sourceGroup .source-group-header {
+  cursor: grab;
+}
+
+.react-flow__node-sourceGroup.dragging .source-group-header {
+  cursor: grabbing;
 }
