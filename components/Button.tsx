@@ -9,6 +9,7 @@ interface ButtonProps {
   disabled?: boolean;
   style?: React.CSSProperties;
   className?: string;
+  title?: string; // Tooltip text
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({ 
@@ -19,7 +20,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
   level = 'reactflow', // Default to ReactFlow level
   disabled = false,
   style = {},
-  className = ''
+  className = '',
+  title
 }, ref) => {
   // Build CSS class names based on level
   const levelPrefix = level === 'reactflow' ? 'rf' : 'nc';
@@ -38,6 +40,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
       className={classNames}
       style={style}
       disabled={disabled}
+      title={title}
     >
       {children}
     </button>
