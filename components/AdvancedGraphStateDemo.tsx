@@ -70,7 +70,7 @@ export function AdvancedGraphStateDemo() {
 
   const handleSaveState = () => {
     if (newStateName.trim()) {
-      const stateId = saveState(newStateName.trim());
+      saveState(newStateName.trim());
       setNewStateName('');
     } else {
       saveState();
