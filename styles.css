@@ -184,6 +184,16 @@
    NODE TOOLBAR STYLES
    ============================================================================= */
 
+/* Smooth transitions for node position changes during auto-layout */
+.react-flow__node {
+  transition: transform 300ms ease-out;
+}
+
+/* Disable transition while dragging for immediate feedback */
+.react-flow__node.dragging {
+  transition: none;
+}
+
 /* NodeToolbar container */
 .react-flow__node-toolbar {
   /* Override default ReactFlow toolbar styles */
@@ -227,6 +237,11 @@
    CUSTOM EDGE STYLES
    ============================================================================= */
 
+/* =============================================================================
+   EDGE LABEL STYLES
+   Labels/badges that appear on edges (connector name badges)
+   ============================================================================= */
+
 /* Edge label container */
 .edge-label-container {
   position: absolute;
@@ -236,10 +251,10 @@
   pointer-events: all;
 }
 
-/* Edge label card (the small icon badge) */
+/* Edge label card (the connector badge) */
 .edge-label-card {
   background: #F7F9FB;
-  /* border: 1px solid var(--border-color); */
+  border: 1px solid transparent;
   border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
@@ -250,21 +265,34 @@
   white-space: nowrap;
   height: 24px;
   width: 24px;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
 .edge-label-card:hover {
   background-color: var(--level2-background-color);
-  border: 1px solid var(--border-hover);
+  border-color: var(--edge-hover-color);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+/* Selected state - shows connector name badge */
 .edge-label-card.selected {
-  background-color: var(--level2-background-color);
-  border: 2px solid var(--border-active);
+  background-color: #eff6ff;
+  border: 1.5px solid var(--edge-selected-color);
+  padding: 4px 8px;
+  width: auto;
+  border-radius: 4px;
 }
 
 .edge-label-card.selected .edge-label-icon {
   filter: none;
   opacity: 1;
+}
+
+.edge-label-card.selected .edge-label-text {
+  display: inline;
+  color: var(--edge-selected-color);
+  font-weight: 500;
 }
 
 /* Edge label icon */
@@ -274,17 +302,19 @@
   object-fit: contain;
   filter: grayscale(100%);
   opacity: 0.8;
+  transition: all 0.15s ease;
 }
 
 .edge-label-card:hover .edge-label-icon {
+  filter: grayscale(0%);
   opacity: 1;
 }
 
-/* Edge label text (hidden by default, shown on hover if needed) */
+/* Edge label text (hidden by default, shown when selected) */
 .edge-label-text {
   font-size: var(--text-sm);
-  font-weight: 400;
-  margin: 0 var(--space-2);
+  font-weight: 500;
+  margin-left: 6px;
   display: none;
 }
 
@@ -547,15 +577,165 @@ body {
   right: -3px !important;
 }
 
-/* ReactFlow Edge Customization */
-.react-flow__edge-path {
-  stroke: var(--border-hover) !important;
-  stroke-width: 1px !important;
+/* =============================================================================
+   EDGE STYLES - All edge states
+   Adjust colors and stroke widths here
+   ============================================================================= */
+
+/* --- Edge Color Variables --- */
+:root {
+  /* Default edge */
+  --edge-default-color: #D5DAE4;
+  --edge-default-width: 1px;
+  
+  /* Hover edge */
+  --edge-hover-color: #5D6A85;
+  --edge-hover-width: 1px;
+  
+  /* Selected edge */
+  --edge-selected-color: #1A6CE7;
+  --edge-selected-width: 2px;
+  
+  /* Focused edge (when node/column selected) */
+  --edge-focused-color: #1A6CE7;
+  --edge-focused-width: 1px;
+  
+  /* Inactive/dimmed edge */
+  --edge-inactive-color: #D5DAE4;
+  --edge-inactive-width: 1px;
+  --edge-inactive-opacity: 0.5;
+  
+  /* Error edge */
+  --edge-error-color: #D3132F;
+  --edge-error-hover-color: #860112;
+  --edge-error-width: 1px;
+  --edge-error-selected-width: 2px;
+  
+  /* Animation duration for flow motion */
+  --edge-animation-duration: 1.5s;
 }
 
-.react-flow__edge.selected .react-flow__edge-path {
-  stroke: var(--border-active) !important;
-  stroke-width: 2px !important;
+/* --- Default Edge --- */
+.react-flow__edge-path {
+  stroke: var(--edge-default-color) !important;
+  stroke-width: var(--edge-default-width) !important;
+  fill: none;
+  transition: stroke 0.15s ease, stroke-width 0.15s ease, opacity 0.15s ease;
+}
+
+/* --- Hover Edge --- */
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: var(--edge-hover-color) !important;
+  stroke-width: var(--edge-hover-width) !important;
+  stroke-dasharray: none;
+}
+
+/* --- Selected Edge (2px dashed, animated) --- */
+/* This style applies to selected edges, including when hovered */
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge.selected:hover .react-flow__edge-path {
+  stroke: var(--edge-selected-color) !important;
+  stroke-width: var(--edge-selected-width) !important;
+  stroke-dasharray: 5 5;
+  animation: edgeFlow var(--edge-animation-duration) linear infinite;
+}
+
+/* --- Focused Edge (when node/column selected, 1px dashed animated) --- */
+.react-flow__edge.focused .react-flow__edge-path,
+.react-flow__edge[data-focused="true"] .react-flow__edge-path {
+  stroke: var(--edge-focused-color) !important;
+  stroke-width: var(--edge-focused-width) !important;
+  stroke-dasharray: 5 5;
+  animation: edgeFlow var(--edge-animation-duration) linear infinite;
+}
+
+/* --- Inactive/Dimmed Edge --- */
+.react-flow__edge.inactive .react-flow__edge-path,
+.react-flow__edge[data-inactive="true"] .react-flow__edge-path {
+  stroke: var(--edge-inactive-color) !important;
+  stroke-width: var(--edge-inactive-width) !important;
+  opacity: var(--edge-inactive-opacity);
+}
+
+/* --- Inactive Hover --- */
+.react-flow__edge.inactive:hover .react-flow__edge-path,
+.react-flow__edge[data-inactive="true"]:hover .react-flow__edge-path {
+  stroke: var(--edge-inactive-color) !important;
+  opacity: 0.7;
+}
+
+/* --- Error Edge (1px solid) --- */
+.react-flow__edge.error .react-flow__edge-path,
+.react-flow__edge[data-error="true"] .react-flow__edge-path {
+  stroke: var(--edge-error-color) !important;
+  stroke-width: var(--edge-error-width) !important;
+  stroke-dasharray: none;
+}
+
+/* --- Error Hover (1px solid darker) --- */
+.react-flow__edge.error:hover .react-flow__edge-path,
+.react-flow__edge[data-error="true"]:hover .react-flow__edge-path {
+  stroke: var(--edge-error-hover-color) !important;
+  stroke-width: var(--edge-error-width) !important;
+  stroke-dasharray: none;
+}
+
+/* --- Error Selected (2px solid) --- */
+.react-flow__edge.error.selected .react-flow__edge-path,
+.react-flow__edge[data-error="true"].selected .react-flow__edge-path {
+  stroke: var(--edge-error-color) !important;
+  stroke-width: var(--edge-error-selected-width) !important;
+  stroke-dasharray: none;
+  animation: none;
+}
+
+/* --- Error Selected Hover (2px solid darker) --- */
+.react-flow__edge.error.selected:hover .react-flow__edge-path,
+.react-flow__edge[data-error="true"].selected:hover .react-flow__edge-path {
+  stroke: var(--edge-error-hover-color) !important;
+  stroke-width: var(--edge-error-selected-width) !important;
+  stroke-dasharray: none;
+  animation: none;
+}
+
+/* --- Flow Motion Animation --- */
+@keyframes edgeFlow {
+  from {
+    stroke-dashoffset: 20;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* --- Edge with animated dashes (general focused state) --- */
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke-dasharray: 5 5;
+  animation: edgeFlow var(--edge-animation-duration) linear infinite;
+}
+
+/* --- Z-Index for Selected/Focused States --- */
+/* Edges: selected and focused edges appear on top */
+.react-flow__edge.selected,
+.react-flow__edge.focused,
+.react-flow__edge[data-focused="true"] {
+  z-index: 1000 !important;
+}
+
+/* Nodes: selected and focused nodes appear on top */
+.react-flow__node.selected,
+.react-flow__node.focused,
+.react-flow__node[data-focused="true"] {
+  z-index: 1000 !important;
+}
+
+/* Hovered elements slightly below selected */
+.react-flow__edge:hover {
+  z-index: 999 !important;
+}
+
+.react-flow__node:hover {
+  z-index: 999 !important;
 }
 
 /* ReactFlow Controls Customization */
@@ -1178,7 +1358,7 @@ hr {
 /* Pinned column section - fixed position between search and scrollable list */
 .pinned-column-section {
   margin: 0 -8px;
-  padding: 2px 0;
+  padding: 0 0 2px;
 }
 
 .pinned-column-section .child-item.pinned {
@@ -1192,6 +1372,11 @@ hr {
 
 .pinned-column-section .child-item.pinned .column-handle {
   opacity: 1;
+}
+
+/* Reduce children-list height when pinned column exists to prevent card size shift */
+.pinned-column-section + .children-list {
+  max-height: 178px; /* 206px - 28px (pinned column height) */
 }
 
 .children-list {
@@ -1271,6 +1456,25 @@ hr {
 .child-item.selected {
   background-color: #ECEEF1;
   /* border: 1px solid rgba(59, 130, 246, 0.3); */
+}
+
+/* Primary selected column - the one user directly clicked */
+.child-item.selected.primary {
+  background-color: #085BD7;
+  color: #FBFBFB;
+}
+
+.child-item.selected.primary:hover {
+  background-color: #1A6CE7;
+}
+
+.child-item.selected.primary .child-name {
+  color: #FBFBFB;
+}
+
+/* Icon inherits color from parent, so setting color on child-item works */
+.child-item.selected.primary svg {
+  color: #FBFBFB;
 }
 
 .child-item.focused {
@@ -1372,6 +1576,13 @@ hr {
   white-space: nowrap;
   text-overflow: ellipsis;
   flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+/* Default icon color */
+.child-name svg {
+  color: #5D6A85;
   display: flex;
   align-items: center;
 }

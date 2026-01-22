@@ -7,14 +7,12 @@ export function useDynamicExpansion() {
   
   // Initialize the relationship manager with all available nodes and edges
   const initializeRelationships = useCallback((nodes: LineageNode[], edges: LineageEdge[]) => {
-    console.log('🔗 useDynamicExpansion: Initializing relationships with', nodes.length, 'nodes and', edges.length, 'edges');
     dynamicRelationshipManager.addNodes(nodes);
     dynamicRelationshipManager.addEdges(edges);
   }, []);
 
   // Update visible nodes in the relationship manager
   const updateVisibleNodes = useCallback((visibleNodeIds: Set<string>) => {
-    console.log('🔗 useDynamicExpansion: Updating visible nodes', Array.from(visibleNodeIds));
     dynamicRelationshipManager.setVisibleNodes(visibleNodeIds);
   }, []);
 
@@ -25,12 +23,8 @@ export function useDynamicExpansion() {
 
   // Expand upstream for a node
   const expandUpstream = useCallback((nodeId: string) => {
-    console.log('🔗 useDynamicExpansion: Expanding upstream for', nodeId);
-    
     const nodesToAdd = dynamicRelationshipManager.getUpstreamNodesToAdd(nodeId);
     const edgesToAdd = dynamicRelationshipManager.getUpstreamEdgesToAdd(nodeId);
-    
-    console.log('🔗 useDynamicExpansion: Found', nodesToAdd.length, 'nodes and', edgesToAdd.length, 'edges to add');
     
     // Mark as expanded
     const expandedNodeIds = new Set(nodesToAdd.map(n => n.id));
@@ -45,12 +39,8 @@ export function useDynamicExpansion() {
 
   // Expand downstream for a node
   const expandDownstream = useCallback((nodeId: string) => {
-    console.log('🔗 useDynamicExpansion: Expanding downstream for', nodeId);
-    
     const nodesToAdd = dynamicRelationshipManager.getDownstreamNodesToAdd(nodeId);
     const edgesToAdd = dynamicRelationshipManager.getDownstreamEdgesToAdd(nodeId);
-    
-    console.log('🔗 useDynamicExpansion: Found', nodesToAdd.length, 'nodes and', edgesToAdd.length, 'edges to add');
     
     // Mark as expanded
     const expandedNodeIds = new Set(nodesToAdd.map(n => n.id));
@@ -65,11 +55,7 @@ export function useDynamicExpansion() {
 
   // Collapse upstream for a node
   const collapseUpstream = useCallback((nodeId: string) => {
-    console.log('🔗 useDynamicExpansion: Collapsing upstream for', nodeId);
-    
     const nodesToRemove = dynamicRelationshipManager.getUpstreamNodesToRemove(nodeId);
-    
-    console.log('🔗 useDynamicExpansion: Found', nodesToRemove.length, 'nodes to remove');
     
     // Mark as collapsed
     dynamicRelationshipManager.markUpstreamCollapsed(nodeId);
@@ -81,11 +67,7 @@ export function useDynamicExpansion() {
 
   // Collapse downstream for a node
   const collapseDownstream = useCallback((nodeId: string) => {
-    console.log('🔗 useDynamicExpansion: Collapsing downstream for', nodeId);
-    
     const nodesToRemove = dynamicRelationshipManager.getDownstreamNodesToRemove(nodeId);
-    
-    console.log('🔗 useDynamicExpansion: Found', nodesToRemove.length, 'nodes to remove');
     
     // Mark as collapsed
     dynamicRelationshipManager.markDownstreamCollapsed(nodeId);

@@ -72,7 +72,6 @@ export function AdvancedGraphStateDemo() {
     if (newStateName.trim()) {
       const stateId = saveState(newStateName.trim());
       setNewStateName('');
-      console.log('State saved with ID:', stateId);
     } else {
       saveState();
     }

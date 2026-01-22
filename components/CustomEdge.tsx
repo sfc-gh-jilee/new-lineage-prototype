@@ -44,24 +44,6 @@ const SPECIAL_EDGE_TYPES = {
     icon: 'icons/fivetran.png', // Path to Fivetran logo
     description: 'Fivetran sync'
   },
-  // 'CTAS': {
-  //   label: 'CTAS',
-  //   color: '#10B981',
-  //   icon: '/icons/sql.svg', // Path to SQL icon
-  //   description: 'Create Table As Select'
-  // },
-  // 'MERGE': {
-  //   label: 'Merge',
-  //   color: '#8B5CF6',
-  //   icon: '/icons/sql.svg', // Path to SQL icon
-  //   description: 'Merge operation'
-  // },
-  // 'VIEW DEP': {
-  //   label: 'View',
-  //   color: '#06B6D4',
-  //   icon: '/icons/sql.svg', // Path to SQL icon
-  //   description: 'View dependency'
-  // }
 } as const;
 
 export function CustomEdge({
@@ -74,6 +56,7 @@ export function CustomEdge({
   style = {},
   data,
   markerEnd,
+  selected,
 }: EdgeProps<EdgeData>) {
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -86,7 +69,8 @@ export function CustomEdge({
 
   const relation = data?.relation || '';
   const isColumnEdge = data?.isColumnEdge || false;
-  const isSelected = data?.isSelected || false;
+  const isDataSelected = data?.isSelected || false;
+  const isSelected = selected || isDataSelected;
   
   // Check if this edge needs a special label
   const specialEdge = SPECIAL_EDGE_TYPES[relation as keyof typeof SPECIAL_EDGE_TYPES];
@@ -94,12 +78,15 @@ export function CustomEdge({
   // Don't show labels for column edges or if no special treatment needed
   const shouldShowLabel = !isColumnEdge && specialEdge;
 
-  // Custom styling for different edge types
+  // Only apply custom styling for special edge types (not selected state - let CSS handle that)
+  // Selected state styling is handled by CSS (.react-flow__edge.selected)
   const edgeStyle = {
     ...style,
-    strokeWidth: isSelected ? 3 : (specialEdge ? 2 : 1),
-    stroke: isSelected ? '#10B981' : (specialEdge?.color || style.stroke || '#b1b1b7'),
-    opacity: isSelected ? 1 : 0.8,
+    // Only override stroke for special edge types when NOT selected
+    ...(specialEdge && !isSelected ? {
+      strokeWidth: 2,
+      stroke: specialEdge.color,
+    } : {}),
   };
 
   return (

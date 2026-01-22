@@ -675,7 +675,6 @@ export class GraphStateManager {
         return value;
       }));
       
-      console.log('💾 Graph state saved:', stateToSave.metadata.name, 'ID:', stateId);
       return stateId;
     } catch (error) {
       console.error('Failed to save graph state:', error);
@@ -690,7 +689,6 @@ export class GraphStateManager {
       if (savedStateData) {
         const parsedState = this.parseStateFromJSON(savedStateData);
         this.state = parsedState;
-        console.log('📂 Current graph state loaded:', parsedState.metadata.name);
       }
     } catch (error) {
       console.error('Failed to load current graph state:', error);
@@ -715,8 +713,6 @@ export class GraphStateManager {
           }
           return value;
         }));
-        
-        console.log('📂 Graph state loaded:', stateToLoad.metadata.name);
       } else {
         console.error('State not found:', stateId);
       }
@@ -760,8 +756,6 @@ export class GraphStateManager {
         }
         return value;
       }));
-      
-      console.log('🗑️ Saved state deleted:', stateId);
     } catch (error) {
       console.error('Failed to delete saved state:', error);
     }
@@ -904,7 +898,6 @@ export class GraphStateManager {
       const importedState = this.parseStateFromJSON(jsonString);
       this.state = importedState;
       this.updateLastModified();
-      console.log('📥 State imported successfully');
     } catch (error) {
       console.error('Failed to import state from JSON:', error);
       throw error;

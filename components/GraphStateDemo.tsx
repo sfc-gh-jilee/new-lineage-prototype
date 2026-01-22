@@ -41,14 +41,10 @@ export function GraphStateDemo() {
   };
 
   const handleExpandUpstream = (nodeId: string) => {
-    const available = getAvailableUpstreamNodes(nodeId);
-    console.log(`Available upstream nodes for ${nodeId}:`, available.length);
     expandUpstream(nodeId);
   };
 
   const handleExpandDownstream = (nodeId: string) => {
-    const available = getAvailableDownstreamNodes(nodeId);
-    console.log(`Available downstream nodes for ${nodeId}:`, available.length);
     expandDownstream(nodeId);
   };
 

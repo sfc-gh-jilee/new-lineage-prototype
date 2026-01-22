@@ -36,11 +36,8 @@ export function useHistory(): UseHistoryReturn {
   const pushState = useCallback((state: HistoryState) => {
     // Don't record state changes during undo/redo operations
     if (isUndoRedoRef.current) {
-      console.log('⏸️ Skipping state push during undo/redo');
       return;
     }
-
-    console.log('💾 Pushing state to history', { currentIndex, historyLength: historyRef.current.length });
     
     // Remove any future states if we're not at the end
     historyRef.current = historyRef.current.slice(0, currentIndex + 1);
@@ -61,7 +58,6 @@ export function useHistory(): UseHistoryReturn {
 
   const undo = useCallback(() => {
     if (canUndo) {
-      console.log('⏪ Undo from index', currentIndex, 'to', currentIndex - 1);
       isUndoRedoRef.current = true;
       setCurrentIndex(prev => prev - 1);
       setTimeout(() => {
@@ -72,7 +68,6 @@ export function useHistory(): UseHistoryReturn {
 
   const redo = useCallback(() => {
     if (canRedo) {
-      console.log('⏩ Redo from index', currentIndex, 'to', currentIndex + 1);
       isUndoRedoRef.current = true;
       setCurrentIndex(prev => prev + 1);
       setTimeout(() => {
@@ -83,7 +78,6 @@ export function useHistory(): UseHistoryReturn {
 
   const getCurrentState = useCallback(() => {
     const state = historyRef.current[currentIndex];
-    console.log('📖 Getting current state at index', currentIndex, state ? '✅' : '❌');
     return state;
   }, [currentIndex]);
 

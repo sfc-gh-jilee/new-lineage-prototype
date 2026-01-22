@@ -80,17 +80,18 @@ function createColumnLineageEdges(
         sourceHandle,
         targetHandle,
         type: 'default',
-        selected: true,
+        animated: true, // Enable flow animation for column lineage edges
+        className: 'focused', // Use focused style (1px dashed animated)
         style: {
-          stroke: '#10b981', // Green for selected
-          strokeWidth: 2,
+          stroke: '#1A6CE7', // Blue for focused column lineage
+          strokeWidth: 1,
           strokeDasharray: '5,5',
           opacity: 1
         },
         data: { 
           relation: edge.relation,
           isColumnEdge: true,
-          isSelected: true
+          isFocused: true
         }
       });
     });
@@ -123,10 +124,10 @@ function createColumnLineageEdges(
         type: 'default',
         selected: false,
         style: {
-          stroke: '#94a3b8', // Gray for hovered
+          stroke: '#D5DAE4', // Light gray for hovered
           strokeWidth: 1,
           strokeDasharray: '3,3',
-          opacity: 0.7
+          opacity: 1
         },
         data: { 
           relation: edge.relation,
@@ -210,12 +211,10 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
   const [showFilterPopover, setShowFilterPopover] = useState(false);
   const [showDemoMenu, setShowDemoMenu] = useState(false);
 
-  // Debug demo menu state changes
-  useEffect(() => {
-    console.log('Demo menu state changed:', showDemoMenu);
-  }, [showDemoMenu]);
-
   const [selectedChildrenByNode, setSelectedChildrenByNode] = useState<Record<string, Set<string>>>({});
+  // Pinned columns by node - each node can have one pinned column shown above the scrollable list
+  const [pinnedColumnsByNode, setPinnedColumnsByNode] = useState<Record<string, string>>({});
+  // Legacy single focused column for drawer (the primary selected column)
   const [focusedColumn, setFocusedColumn] = useState<{
     nodeId: string;
     columnName: string;
@@ -237,6 +236,130 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
   const updateNodeInternals = useUpdateNodeInternals();
   const nodesRef = useRef<Node<NodeCardData>[]>([]);
   const edgesRef = useRef<Edge<EdgeData>[]>([]);
+  
+  // Ref to track pending centering timeout - ensures only one centering call at a time
+  const pendingCenteringRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Flag to indicate centering is scheduled - viewport refresh calls should skip
+  const isCenteringScheduledRef = useRef(false);
+
+  // Helper to get node bounds (position + dimensions)
+  const getNodeBounds = useCallback((nodeId: string) => {
+    const node = nodesRef.current.find(n => n.id === nodeId);
+    if (!node) return null;
+    
+    const nodeAny = node as any;
+    const width = nodeAny.measured?.width || node.width || 280;
+    const height = nodeAny.measured?.height || node.height || 160;
+    
+    return {
+      x: node.position.x,
+      y: node.position.y,
+      width,
+      height,
+      right: node.position.x + width,
+      bottom: node.position.y + height,
+    };
+  }, []);
+
+  // Center viewport on a bounding box of selected and focused elements
+  // - selectedNodeIds: nodes directly clicked/selected by user
+  // - focusedNodeIds: nodes indirectly highlighted (e.g., connected to selected columns)
+  // - focusedEdges: edges that connect selected/focused elements
+  const centerOnSelection = useCallback((
+    selectedNodeIds: string[],
+    focusedNodeIds: string[] = [],
+    focusedEdges: Edge<any>[] = [],
+    duration: number = 300
+  ) => {
+    const container = reactFlowWrapperRef.current?.querySelector('.react-flow');
+    if (!container) {
+      console.warn('🎯 centerOnSelection: No container found');
+      return;
+    }
+
+    // Collect all node IDs to include in bounding box
+    const allNodeIds = new Set<string>([...selectedNodeIds, ...focusedNodeIds]);
+    
+    // Add nodes from focused edges
+    focusedEdges.forEach(edge => {
+      allNodeIds.add(edge.source);
+      allNodeIds.add(edge.target);
+    });
+
+    if (allNodeIds.size === 0) {
+      console.warn('🎯 centerOnSelection: No node IDs provided');
+      return;
+    }
+
+    // Calculate bounding box of all elements
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    
+    allNodeIds.forEach(nodeId => {
+      const bounds = getNodeBounds(nodeId);
+      if (bounds) {
+        minX = Math.min(minX, bounds.x);
+        minY = Math.min(minY, bounds.y);
+        maxX = Math.max(maxX, bounds.right);
+        maxY = Math.max(maxY, bounds.bottom);
+      }
+    });
+
+    if (minX === Infinity) {
+      console.warn('🎯 centerOnSelection: No valid node bounds found for', Array.from(allNodeIds));
+      return;
+    }
+
+    // Calculate center of bounding box
+    const boundsCenterX = (minX + maxX) / 2;
+    const boundsCenterY = (minY + maxY) / 2;
+
+    const { width: containerWidth, height: containerHeight } = container.getBoundingClientRect();
+    const viewport = getViewport();
+    
+    // Calculate viewport position to center the bounding box
+    const newX = containerWidth / 2 - boundsCenterX * viewport.zoom;
+    const newY = containerHeight / 2 - boundsCenterY * viewport.zoom;
+    
+    console.log('🎯 centerOnSelection:', {
+      nodeIds: Array.from(allNodeIds),
+      bounds: { minX, minY, maxX, maxY },
+      boundsCenter: { x: boundsCenterX, y: boundsCenterY },
+      container: { width: containerWidth, height: containerHeight },
+      viewport,
+      newViewport: { x: newX, y: newY, zoom: viewport.zoom }
+    });
+    
+    setViewport({ x: newX, y: newY, zoom: viewport.zoom }, { duration });
+  }, [getViewport, setViewport, getNodeBounds]);
+
+  // Scheduled centering - cancels any pending centering and schedules a new one
+  // This ensures only the latest centering request is executed
+  const scheduleCentering = useCallback((
+    selectedNodeIds: string[],
+    focusedNodeIds: string[] = [],
+    focusedEdges: Edge<any>[] = [],
+    delay: number = 300,
+    duration: number = 300
+  ) => {
+    // Cancel any pending centering
+    if (pendingCenteringRef.current) {
+      clearTimeout(pendingCenteringRef.current);
+      pendingCenteringRef.current = null;
+    }
+    
+    // Mark centering as scheduled - viewport refresh calls should skip
+    isCenteringScheduledRef.current = true;
+    
+    // Schedule new centering
+    pendingCenteringRef.current = setTimeout(() => {
+      centerOnSelection(selectedNodeIds, focusedNodeIds, focusedEdges, duration);
+      pendingCenteringRef.current = null;
+      // Clear the flag after animation completes
+      setTimeout(() => {
+        isCenteringScheduledRef.current = false;
+      }, duration);
+    }, delay);
+  }, [centerOnSelection]);
 
   // Group node management functions
   const handleGroupResize = useCallback((nodeId: string, width: number, height: number) => {
@@ -393,9 +516,10 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
     }
     
     // Trigger auto-layout when node dimensions change (e.g., column expand/collapse)
+    // Pass false to skip fitView - we don't want to re-center the view on dimension changes
     if (dimensionChanges.length > 0 && autoLayoutEnabledRef.current) {
       // Debounce to avoid too many layout calls during rapid dimension changes
-      applyAutoLayoutRef.current();
+      applyAutoLayoutRef.current(false);
     }
   }, [onNodesChange, selectedNodeIds, rfNodes, captureState, pushState]);
 
@@ -423,7 +547,6 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
           setTimeout(() => {
             const state = getCurrentState();
             if (state) {
-              console.log('🔄 Restoring state after undo');
               restoreState(state);
             }
           }, 10);
@@ -438,7 +561,6 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
           setTimeout(() => {
             const state = getCurrentState();
             if (state) {
-              console.log('🔄 Restoring state after redo');
               restoreState(state);
             }
           }, 10);
@@ -674,7 +796,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
           sourceHandle: `${e.source}-main-out`,
           targetHandle: `${e.target}-main-in`,
           data: { relation: e.relation },
-          animated: true,
+          animated: false,
           // style: { cursor: 'default' },
         }) as Edge<EdgeData>,
     );
@@ -697,7 +819,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
               sourceHandle: `${parentId}-main-out`,
               targetHandle: `${groupId}-main-in`,
               data: { relation: 'GROUP' },
-              animated: true,
+              animated: false,
             } as Edge<EdgeData>);
           } else {
             edges.push({
@@ -708,7 +830,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
               sourceHandle: `${groupId}-main-out`,
               targetHandle: `${parentId}-main-in`,
               data: { relation: 'GROUP' },
-              animated: true,
+              animated: false,
             } as Edge<EdgeData>);
           }
         }
@@ -749,7 +871,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
   // Auto-layout refs for debouncing
   const autoLayoutTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoLayoutEnabledRef = useRef(true);
-  const applyAutoLayoutRef = useRef<() => void>(() => {});
+  const applyAutoLayoutRef = useRef<(shouldFitView?: boolean) => void>(() => {});
   const skipAutoLayoutRef = useRef(false); // Skip auto-layout when predictive layout was just applied
   
   // Keep ref in sync with state
@@ -761,7 +883,8 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
   const isLayoutInProgressRef = useRef(false);
   
   // Auto-layout function - applies ELK layout when enabled
-  const applyAutoLayout = useCallback(async () => {
+  // shouldFitView: controls whether to center the view after layout (default: false to keep viewport stable)
+  const applyAutoLayout = useCallback(async (shouldFitView: boolean = false) => {
     // Prevent re-entry during layout
     if (isLayoutInProgressRef.current) {
       return;
@@ -813,8 +936,8 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
       const nodesWithDimensions = currentNodes.map(node => {
         const hasExpandedColumns = (node.data as any)?.childrenExpanded === true;
         
-        // Use fixed heights: 378px for expanded (max height), 160px for collapsed
-        const height = hasExpandedColumns ? 378 : 160;
+        // Use fixed heights: 400px for expanded (max height), 160px for collapsed
+        const height = hasExpandedColumns ? 440 : 160;
         const width = 280; // Standard card width
         
         return {
@@ -834,9 +957,12 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
           })
         );
         
-        // Center all nodes in viewport after layout (no animation to avoid triggering more changes)
+        // Only center the view if shouldFitView is true (e.g., when nodes are added/removed)
+        // Skip fitView for dimension changes to avoid re-centering during panning
         setTimeout(() => {
-          fitView({ padding: 0.15, duration: 0, maxZoom: 1 });
+          if (shouldFitView) {
+            fitView({ padding: 0.15, duration: 0, minZoom: 1, maxZoom: 1 });
+          }
           isLayoutInProgressRef.current = false;
         }, 50);
       } catch (error) {
@@ -1002,10 +1128,10 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
       }
     })));
     
-    // Trigger auto-layout after DOM has updated
+    // Trigger auto-layout after DOM has updated (don't fitView for dimension changes)
     setTimeout(() => {
       skipAutoLayoutRef.current = false; // Re-enable for future changes
-      applyAutoLayout();
+      applyAutoLayout(false);
     }, 100);
   }, [showAllChildren, setRfNodes, applyAutoLayout]);
 
@@ -1023,30 +1149,21 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
         pushState(captureState());
       }
       
-      console.log('🔓 handleExpand called', nodeId, dir);
       const parent = nodesRef.current.find((n) => n.id === nodeId);
       if (!parent) return;
 
       // Update dynamic expansion state
       try {
-        const expansionResult = dir === 'up' 
+        dir === 'up' 
           ? dynamicExpansion.expandUpstream(nodeId)
           : dynamicExpansion.expandDownstream(nodeId);
-        
-        console.log('🔗 Dynamic expansion result:', expansionResult);
       } catch (error) {
-        console.error('🔗 Dynamic expansion error:', error);
+        // Silently handle expansion errors
       }
       expandMutation.mutate(
         { nodeId, dir },
         {
           onSuccess: ({ ids }) => {
-            console.log('🔓 handleExpand onSuccess START', {
-              nodeId,
-              dir,
-              visibleNodeIds: Array.from(visibleNodeIds),
-              idsFound: ids.length
-            });
             const currentVisible = new Set(visibleNodeIds);
             // Always ensure the parent node is in the visible set
             currentVisible.add(nodeId);
@@ -1063,9 +1180,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
               : ids;
             
             const toAdd = sameSchemaIds.filter((id) => !currentVisible.has(id));
-            console.log('🔓 handleExpand onSuccess', nodeId, dir, 'found:', ids.length, 'sameSchema:', sameSchemaIds.length, 'toAdd:', toAdd.length);
             if (toAdd.length === 0) {
-              console.log('⚠️ No new nodes to add - all already visible. Updating expanded flag and tracking.');
               // Track only the nodes that are actually visible (not all possible nodes)
               const visibleDownstreamNodes = sameSchemaIds.filter(id => currentVisible.has(id));
               if (dir === 'up') {
@@ -1098,24 +1213,15 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
               );
               return;
             }
-            console.log('✅ Adding nodes to visible:', toAdd);
             
             // NEW LOGIC: If more than 10 nodes, show first 3 as normal nodes and rest in compact grid
             const THRESHOLD = 10;
             const SHOW_NORMAL = 3;
             
-            console.log('🔍 Checking compact grid threshold:', { 
-              idsLength: ids.length,
-              toAddLength: toAdd.length, 
-              threshold: THRESHOLD,
-              willUseCompactGrid: ids.length > THRESHOLD 
-            });
-            
             let newNodes: Node[] = [];
             
             // Use ids.length instead of toAdd.length to check total siblings
             if (ids.length > THRESHOLD) {
-              console.log('🎨 Creating group node with many children!');
               // Split into normal nodes and group node
               const normalNodeIds = toAdd.slice(0, SHOW_NORMAL);
               const groupedNodeIds = toAdd.slice(SHOW_NORMAL);
@@ -1136,11 +1242,6 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
               // Create group node as a special NodeCard
               const groupNodeId = `${nodeId}-group-${dir}`;
               const groupedNodes = groupedNodeIds.map(id => ALL_NODE_BY_ID.get(id)!);
-              console.log('📦 Group node details:', {
-                groupNodeId,
-                groupedNodeCount: groupedNodes.length,
-                normalNodeCount: normalNodeIds.length
-              });
               
               // Create a group node that looks like a NodeCard but contains mini cards
               const groupNode: Node<NodeCardData> = {
@@ -1156,8 +1257,6 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
                   isGroupNode: true, // Special flag
                   groupedNodes: groupedNodes, // Store the grouped nodes
                   onPromoteNode: (promotedNodeId: string) => {
-                    console.log('🎯 Promoting node from group:', promotedNodeId);
-                    
                     // Add to visible nodes first
                     const updatedVisible = new Set(visibleNodeIds);
                     updatedVisible.add(promotedNodeId);
@@ -1302,13 +1401,6 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
             
             setVisibleNodeIds(currentVisible);
             
-            console.log('🔍 Setting visible nodes:', {
-              nodeId,
-              dir,
-              currentVisible: Array.from(currentVisible),
-              groupNodesInVisible: Array.from(currentVisible).filter(id => id.includes('-group-'))
-            });
-            
             // Track only the nodes that are actually visible after adding new ones
             // This ensures we can properly collapse the same nodes later
             const nodesToTrack = sameSchemaIds.filter(id => currentVisible.has(id));
@@ -1345,18 +1437,17 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
                 ] as any,
             );
             const edges = buildRfEdges(currentVisible);
-            console.log('🔗 Building edges:', {
-              visibleNodeCount: currentVisible.size,
-              visibleNodes: Array.from(currentVisible),
-              edgeCount: edges.length,
-              edges: edges.map(e => `${e.source} -> ${e.target}`)
-            });
             // Merge with existing edges to preserve edges from promoted nodes
             setRfEdges((currentEdges) => {
               const edgeMap = new Map(currentEdges.map(e => [e.id, e]));
               edges.forEach(e => edgeMap.set(e.id, e));
               return Array.from(edgeMap.values()) as any;
             });
+            
+            // Center on the parent node + all newly expanded nodes after layout settles
+            // This creates a bounding box around all "focused" elements
+            const focusedNodeIds = [nodeId, ...newNodes.map(n => n.id)];
+            scheduleCentering(focusedNodeIds, [], [], 250);
           },
         },
       );
@@ -1373,6 +1464,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
       pushState,
       captureState,
       dynamicExpansion,
+      scheduleCentering,
     ],
   );
 
@@ -1383,26 +1475,20 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
         pushState(captureState());
       }
       
-      console.log('🔒 handleCollapse called', nodeId, dir);
-
       // Update dynamic expansion state
       try {
-        const collapseResult = dir === 'up' 
+        dir === 'up' 
           ? dynamicExpansion.collapseUpstream(nodeId)
           : dynamicExpansion.collapseDownstream(nodeId);
-        
-        console.log('🔗 Dynamic collapse result:', collapseResult);
       } catch (error) {
-        console.error('🔗 Dynamic collapse error:', error);
+        // Silently handle collapse errors
       }
       const record =
         dir === 'up'
           ? expandedUpstreamByNode[nodeId] || new Set<string>()
           : expandedDownstreamByNode[nodeId] || new Set<string>();
       const toRemove = new Set(record);
-      console.log('🔒 Nodes to remove:', Array.from(toRemove));
       if (toRemove.size === 0) {
-        console.log('⚠️ No nodes in tracking to remove. Just updating collapsed flag.');
         setRfNodes(
           (curr) =>
             curr.map((cn) =>
@@ -1429,21 +1515,16 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
       const groupNodeId = `${nodeId}-group-${dir}`;
       if (nextVisible.has(groupNodeId)) {
         nextVisible.delete(groupNodeId);
-        console.log('🗑️ Removing group node:', groupNodeId);
       }
       
-      console.log('✅ Removing from visible, new count:', nextVisible.size);
-      console.log('✅ Nodes that will remain visible:', Array.from(nextVisible));
       setVisibleNodeIds(nextVisible);
       if (dir === 'up') {
         const copy = { ...expandedUpstreamByNode };
         delete copy[nodeId];
-        console.log('✅ Deleting upstream tracking for', nodeId);
         setExpandedUpstreamByNode(copy);
       } else {
         const copy = { ...expandedDownstreamByNode };
         delete copy[nodeId];
-        console.log('✅ Deleting downstream tracking for', nodeId);
         setExpandedDownstreamByNode(copy);
       }
       setRfNodes(
@@ -1469,13 +1550,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
           // Keep edge only if BOTH source and target are still in nextVisible
           const sourceStillVisible = nextVisible.has(e.source as string);
           const targetStillVisible = nextVisible.has(e.target as string);
-          const keep = sourceStillVisible && targetStillVisible;
-          
-          if (!keep) {
-            console.log(`🗑️ Removing edge: ${e.source} -> ${e.target} (source visible: ${sourceStillVisible}, target visible: ${targetStillVisible})`);
-          }
-          
-          return keep;
+          return sourceStillVisible && targetStillVisible;
         }),
       );
     },
@@ -1495,7 +1570,6 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
   );
 
   const resetGraph = useCallback(() => {
-    console.log('🔄 resetGraph called');
     
     // Show only FCT_ORDERS initially
     const initialNodeIds = ['DW.PUBLIC.FCT_ORDERS'];
@@ -1546,7 +1620,10 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
       const downstreamExpanded = (expandedDownstreamByNode[n.id]?.size || 0) > 0;
       
       const selectedChildren = selectedChildrenByNode[n.id] || new Set<string>();
-      const focusedChild = focusedColumn?.nodeId === n.id ? focusedColumn?.columnName : undefined;
+      // Use pinnedColumnsByNode for the pinned/focused column in this node
+      const focusedChild = pinnedColumnsByNode[n.id] || undefined;
+      // Primary selected column is the one user directly clicked (tracked by focusedColumn)
+      const primarySelectedColumn = focusedColumn?.nodeId === n.id ? focusedColumn.columnName : undefined;
       const isMultiSelected = selectedNodeIds.has(n.id);
       const isPrimarySelected = selectedNodeId === n.id;
       const isSelected = isPrimarySelected || isMultiSelected; // Show selected style for all multi-selected nodes
@@ -1561,18 +1638,15 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
           multiSelected: isMultiSelected,
           selectedChildren,
           focusedChild,
+          primarySelectedColumn, // The column user directly clicked
           onToggleUpstream: () => {
-            // Use the dynamic expansion state as the source of truth
             const expansionState = dynamicExpansion.getExpansionState(n.id);
             const isCurrentlyExpanded = expansionState.upstreamExpanded;
-            console.log('🔗 onToggleUpstream: Current state for', n.id, ':', expansionState);
             isCurrentlyExpanded ? handleCollapse(n.id, 'up') : handleExpand(n.id, 'up');
           },
           onToggleDownstream: () => {
-            // Use the dynamic expansion state as the source of truth
             const expansionState = dynamicExpansion.getExpansionState(n.id);
             const isCurrentlyExpanded = expansionState.downstreamExpanded;
-            console.log('🔗 onToggleDownstream: Current state for', n.id, ':', expansionState);
             isCurrentlyExpanded ? handleCollapse(n.id, 'down') : handleExpand(n.id, 'down');
           },
           onToggleChildren: async () => {
@@ -1601,10 +1675,13 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
               return node;
             }));
             
-            // Explicitly trigger auto-layout after state update
+            // Explicitly trigger auto-layout after state update (don't fitView for dimension changes)
             setTimeout(() => {
-              applyAutoLayout();
+              applyAutoLayout(false);
             }, 50);
+            
+            // Note: We don't center here anymore to avoid conflicting with column lineage centering
+            // Centering will happen from the column lineage effect if a column is selected
             
             // Update global state based on whether all nodes now have children expanded
             const allNodesExpanded = rfNodes.every(node => 
@@ -1642,9 +1719,12 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
           },
           onLayoutChange: () => {
             // Trigger ReactFlow to recalculate edge positions when node layout changes
+            // Skip if centering is scheduled to avoid interference
             setTimeout(() => {
-              const currentViewport = getViewport();
-              setViewport({ ...currentViewport });
+              if (!isCenteringScheduledRef.current) {
+                const currentViewport = getViewport();
+                setViewport({ ...currentViewport });
+              }
             }, 50);
           },
           onSelectChild: (childName: string) => {
@@ -1655,7 +1735,8 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
               if (isCurrentlySelected) {
                 // Deselect the child - clear column lineage
                 setSelectedColumnLineage(null);
-                setFocusedColumn(null); // Clear focused column to unpin it
+                setFocusedColumn(null); // Clear focused column for drawer
+                setPinnedColumnsByNode({}); // Clear all pinned columns
                 setDrawerNode(null); // Close drawer
                 const newSelected = new Set(currentSelected);
                 newSelected.delete(childName);
@@ -1668,10 +1749,18 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
                 // 1. Auto-open related nodes that aren't visible
                 // 2. Auto-select related columns in those nodes  
                 // 3. Auto-select column edges
+                // 4. Pin all related columns in their nodes
                 setSelectedNodeId(null); // Clear selected node
                 setSelectedNodeIds(new Set()); // Clear multi-selection
                 setDrawerNode(null); // Close drawer
+                setDrawerEdge(null); // Clear edge drawer
+                // Clear edge selection
+                setRfEdges(edges => edges.map(e => ({
+                  ...e,
+                  data: { ...e.data, isSelected: false }
+                })));
                 setSelectedColumnLineage({ nodeId: n.id, columnName: childName });
+                setFocusedColumn({ nodeId: n.id, columnName: childName }); // Set for drawer
                 
                 // Find and highlight related columns
                 const relatedColumns = findRelatedColumns(n.id, childName);
@@ -1679,10 +1768,23 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
                   [n.id]: new Set([childName]) // Selected column
                 };
                 
-                // Add related columns to selection
+                // Pin all related columns (including the selected one)
+                const newPinnedColumns: Record<string, string> = {
+                  [n.id]: childName // Pin the selected column
+                };
+                
+                // Add related columns to selection and pin them
                 relatedColumns.forEach((columns, tableId) => {
                   newSelectedChildren[tableId] = columns;
+                  // Pin the first related column in each node
+                  const firstColumn = Array.from(columns)[0];
+                  if (firstColumn) {
+                    newPinnedColumns[tableId] = firstColumn;
+                  }
                 });
+                
+                // Update pinned columns state
+                setPinnedColumnsByNode(newPinnedColumns);
                 
                 // Auto-open related nodes that aren't already visible
                 const relatedNodeIds = Array.from(relatedColumns.keys());
@@ -1792,6 +1894,11 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
           onFocusChild: (childName: string) => {
             // Set focused column for side panel
             setFocusedColumn({ nodeId: n.id, columnName: childName });
+            // Pin the column in this node
+            setPinnedColumnsByNode(prev => ({
+              ...prev,
+              [n.id]: childName
+            }));
             // Also set the drawer to show column details
             setDrawerNode({
               ...n,
@@ -1804,7 +1911,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
         },
       };
     });
-  }, [rfNodes, expandedUpstreamByNode, expandedDownstreamByNode, selectedNodeId, selectedNodeIds, selectedChildrenByNode, focusedColumn, handleExpand, handleCollapse, visibleNodeIds, setVisibleNodeIds, setRfNodes, setRfEdges, positionRelatedNodes, setSelectedColumnLineage, setSelectedChildrenByNode, applyAutoLayout, fitView]);
+  }, [rfNodes, expandedUpstreamByNode, expandedDownstreamByNode, selectedNodeId, selectedNodeIds, selectedChildrenByNode, pinnedColumnsByNode, handleExpand, handleCollapse, visibleNodeIds, setVisibleNodeIds, setRfNodes, setRfEdges, positionRelatedNodes, setSelectedColumnLineage, setSelectedChildrenByNode, applyAutoLayout, fitView]);
 
   // Add column lineage edges to the regular edges
   const allEdges = useMemo(() => {
@@ -1814,7 +1921,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
 
   // Force ReactFlow to recalculate edge positions when column lineage changes
   useEffect(() => {
-    if (focusedColumn || selectedColumnLineage) {
+    if (focusedColumn || selectedColumnLineage || Object.keys(pinnedColumnsByNode).length > 0) {
       // Small delay to ensure handles are rendered before edges are calculated
       const timer = setTimeout(() => {
         // Update internals for all nodes with expanded children to recalculate handle positions
@@ -1823,13 +1930,58 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
             updateNodeInternals(node.id);
           }
         });
-        // Also trigger a viewport update to recalculate edge positions
-        const currentViewport = getViewport();
-        setViewport({ ...currentViewport });
+        // Only trigger viewport update if centering is NOT scheduled
+        // This prevents interference with pending centering operations
+        if (!isCenteringScheduledRef.current) {
+          const currentViewport = getViewport();
+          setViewport({ ...currentViewport });
+        }
       }, 150);
       return () => clearTimeout(timer);
     }
-  }, [focusedColumn, selectedColumnLineage, rfNodes, updateNodeInternals, getViewport, setViewport]);
+  }, [focusedColumn, selectedColumnLineage, pinnedColumnsByNode, rfNodes, updateNodeInternals, getViewport, setViewport]);
+
+  // Center view on column lineage selection (includes source node and all related nodes)
+  // Note: We capture visibleNodeIds at the time of selection, not as a dependency
+  const visibleNodeIdsRef = useRef(visibleNodeIds);
+  useEffect(() => {
+    visibleNodeIdsRef.current = visibleNodeIds;
+  }, [visibleNodeIds]);
+
+  useEffect(() => {
+    if (selectedColumnLineage) {
+      const { nodeId, columnName } = selectedColumnLineage;
+      
+      // Collect all nodes involved in the column lineage
+      const involvedNodeIds = new Set<string>([nodeId]);
+      
+      // Find related columns to get all involved nodes
+      const relatedColumns = findRelatedColumns(nodeId, columnName);
+      const relatedTableIds = Array.from(relatedColumns.keys());
+      
+      // Get current visible nodes for filtering
+      const currentVisibleNodes = visibleNodeIdsRef.current;
+      
+      relatedTableIds.forEach(tableId => {
+        // Add ALL related nodes that are visible on the canvas
+        if (currentVisibleNodes.has(tableId)) {
+          involvedNodeIds.add(tableId);
+        }
+      });
+      
+      console.log('🎯 Column lineage centering:', {
+        selectedColumn: `${nodeId}.${columnName}`,
+        relatedTables: relatedTableIds,
+        visibleNodes: Array.from(currentVisibleNodes),
+        involvedNodes: Array.from(involvedNodeIds),
+        filteredOut: relatedTableIds.filter(id => !currentVisibleNodes.has(id))
+      });
+      
+      // Use scheduleCentering with 350ms delay - this will cancel any other pending centering
+      // (e.g., from handleExpand which uses 250ms) ensuring only one centering call executes
+      scheduleCentering(Array.from(involvedNodeIds), [], [], 350);
+    }
+  }, [selectedColumnLineage, scheduleCentering]); // Removed visibleNodeIds dependency
 
   const onNodeClick: NodeMouseHandler = useCallback((event, node) => {
     setDrawerEdge(null);
@@ -1876,6 +2028,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
             setSelectedNodeId(node.id);
             setDrawerNode(node as Node<NodeCardData>);
           }
+          // Note: Don't center here - let column lineage centering handle it if a column is selected
         }
         return newSelected;
       });
@@ -1891,11 +2044,15 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
         setSelectedNodeId(node.id);
         setDrawerNode(node as Node<NodeCardData>);
         setSelectedNodeIds(new Set([node.id]));
+        // Note: Don't auto-center on node click - it conflicts with column lineage centering
+        // Users can use fitView or manual panning to adjust the view
       }
       
-      // Clear column lineage and children selections
+      // Clear column lineage, pinned columns, and children selections
       setSelectedChildrenByNode({});
       setSelectedColumnLineage(null);
+      setPinnedColumnsByNode({});
+      setFocusedColumn(null);
     }
   }, [selectedNodeId, selectedNodeIds, rfNodes, setRfEdges]);
   const onEdgeClick = useCallback((_: React.MouseEvent, edge: Edge<any>) => {
@@ -1906,18 +2063,25 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
     setSelectedChildrenByNode({}); // Clear all selected children
     setSelectedColumnLineage(null); // Clear column lineage
     setHoveredColumnLineage(null); // Clear hovered column lineage
+    setPinnedColumnsByNode({}); // Clear pinned columns
+    setFocusedColumn(null); // Clear focused column
     
     // Update edges to mark this one as selected
+    // Set both `selected` (for React Flow CSS class) and `data.isSelected` (for CustomEdge)
     setRfEdges(edges => 
       edges.map(e => ({
         ...e,
+        selected: e.id === edge.id,
         data: {
           ...e.data,
           isSelected: e.id === edge.id
         }
       }))
     );
-  }, [setRfEdges]);
+    
+    // Center the view on the selected edge (use short delay via scheduler to avoid conflicts)
+    scheduleCentering([], [], [edge], 50);
+  }, [setRfEdges, scheduleCentering]);
   
   const onPaneClick = useCallback(() => {
     setDrawerNode(null);
@@ -1933,6 +2097,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
     setRfEdges(edges => 
       edges.map(e => ({
         ...e,
+        selected: false,
         data: {
           ...e.data,
           isSelected: false
@@ -1986,10 +2151,10 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
       })
     );
     
-    // Trigger auto-layout after DOM updates
+    // Trigger auto-layout after DOM updates (don't fitView for dimension changes)
     setTimeout(() => {
       skipAutoLayoutRef.current = false;
-      applyAutoLayout();
+      applyAutoLayout(false);
     }, 100);
   }, [selectedNodeIds, setRfNodes, applyAutoLayout]);
 
@@ -2015,21 +2180,19 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
       })
     );
     
-    // Trigger auto-layout after DOM updates
+    // Trigger auto-layout after DOM updates (don't fitView for dimension changes)
     setTimeout(() => {
       skipAutoLayoutRef.current = false;
-      applyAutoLayout();
+      applyAutoLayout(false);
     }, 100);
   }, [selectedNodeIds, setRfNodes, applyAutoLayout]);
 
   const handleGroupNodes = useCallback(() => {
     // TODO: Implement node grouping functionality
-    console.log('Grouping nodes:', Array.from(selectedNodeIds));
   }, [selectedNodeIds]);
 
   const handleDropNodes = useCallback(() => {
     // TODO: Implement node removal functionality
-    console.log('Dropping nodes:', Array.from(selectedNodeIds));
     // For now, just clear the selection
     setSelectedNodeId(null);
     setSelectedNodeIds(new Set());
@@ -2047,9 +2210,6 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
   // Filter handlers
   const handleApplyFilters = useCallback((newFilters: FilterOptions) => {
     setFilters(newFilters);
-    
-    console.log('Applying filters:', newFilters);
-    console.log('Selected nodes for directional filtering:', Array.from(selectedNodeIds));
     
     // Apply filters to nodes and edges
     let filteredNodeIds = new Set<string>();
@@ -2212,7 +2372,6 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
     (node: LineageNode, position?: { x: number; y: number }) => {
       // Check if node is already on the canvas
       if (visibleNodeIds.has(node.id)) {
-        console.log('Node already on canvas:', node.id);
         return;
       }
 
@@ -2288,14 +2447,13 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
           sourceHandle: `${edge.source}-main-out`,
           targetHandle: `${edge.target}-main-in`,
           data: { relation: edge.relation },
-          animated: true,
+          animated: false,
         }));
 
       if (newEdges.length > 0) {
         setRfEdges(prev => [...prev, ...newEdges as any]);
       }
 
-      console.log('Added node from catalog:', node.id, 'at position', nodePosition);
     },
     [visibleNodeIds, setVisibleNodeIds, setRfNodes, setRfEdges, getViewport, makeRfNode, dynamicExpansion]
   );
@@ -2307,11 +2465,8 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
       const newNodes = schemaObjects.filter(node => !visibleNodeIds.has(node.id));
       
       if (newNodes.length === 0) {
-        console.log('All nodes from schema are already on canvas');
         return;
       }
-
-      console.log(`Adding ${newNodes.length} nodes from schema`);
 
       // Calculate correct expansion state for each node
       const allEdges = [...ALL_EDGES, ...ALL_CATALOG_EDGES];
@@ -2348,7 +2503,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
           sourceHandle: `${edge.source}-main-out`,
           targetHandle: `${edge.target}-main-in`,
           data: { relation: edge.relation },
-          animated: true,
+          animated: false,
         }));
 
       // Add all new nodes to visible set
@@ -2409,7 +2564,6 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
         console.error('Error applying ELK layout:', error);
       }
 
-      console.log(`Added ${newNodes.length} nodes and ${newEdges.length} edges from schema`);
     },
     [visibleNodeIds, setVisibleNodeIds, setRfNodes, setRfEdges, rfNodes, rfEdges, makeRfNode, dynamicExpansion, fitView]
   );
@@ -2427,7 +2581,6 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
 
       const nodeDataStr = event.dataTransfer.getData('application/reactflow');
       if (!nodeDataStr) {
-        console.log('No node data in drop event');
         return;
       }
 
@@ -2440,10 +2593,9 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
           y: event.clientY,
         });
 
-        console.log('Drop detected at position:', position);
         handleAddNodeFromCatalog(node, position);
       } catch (error) {
-        console.error('Error parsing dropped node data:', error);
+        // Silently handle drop parsing errors
       }
     },
     [screenToFlowPosition, handleAddNodeFromCatalog]
@@ -2479,7 +2631,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
             onNodesChange={handleNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={(p: Edge<EdgeData> | Connection) =>
-              setRfEdges((eds) => addEdge({ ...p, animated: true }, eds))
+              setRfEdges((eds) => addEdge({ ...p, animated: false }, eds))
             }
             onNodeClick={onNodeClick}
             onEdgeClick={onEdgeClick}
@@ -2488,7 +2640,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
             edgeTypes={edgeTypes as any}
             proOptions={{ hideAttribution: true }}
             // defaultEdgeOptions={{ animated: true, style: { cursor: 'pointer' } }}
-            defaultEdgeOptions={{ animated: true }}
+            defaultEdgeOptions={{ animated: false }}
             defaultViewport={{ x: 0, y: 0, zoom: 1 }}
             panOnDrag={true}
             panOnScroll={false}
@@ -2616,8 +2768,8 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
                   onClick={() => {
                     setAutoLayoutEnabled(!autoLayoutEnabled);
                     if (!autoLayoutEnabled) {
-                      // Trigger layout immediately when enabling
-                      setTimeout(() => applyAutoLayout(), 50);
+                      // Trigger layout immediately when enabling and center the view
+                      setTimeout(() => applyAutoLayout(true), 50);
                     }
                   }}
                 >
@@ -2648,10 +2800,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
                   variant="secondary" 
                   size="md"
                   level="reactflow"
-                  onClick={() => {
-                    console.log('Demo menu button clicked, current state:', showDemoMenu);
-                    setShowDemoMenu(!showDemoMenu);
-                  }}
+                  onClick={() => setShowDemoMenu(!showDemoMenu)}
                   style={{ 
                     backgroundColor: showDemoMenu ? '#e5e7eb' : undefined,
                     border: '1px solid #d1d5db'
@@ -2692,10 +2841,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
                         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
                         pointerEvents: 'auto',
                       }}
-                      onClick={(e) => {
-                        console.log('Demo menu clicked');
-                        e.stopPropagation();
-                      }}
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <div 
                         className="overflow-menu-item"
@@ -2741,13 +2887,18 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
           </ReactFlow>
         </div>
         
-        {/* Drawer - pushes content instead of overlaying */}
+        {/* Drawer - always open side panel */}
         <Drawer
-          title={drawerNode ? (drawerNode.data.focusedChild ? 'Column Details' : 'Object') : drawerEdge ? 'Relationship' : ''}
-          isOpen={!!(drawerNode || drawerEdge)}
+          title={drawerNode ? (drawerNode.data.focusedChild ? 'Column Details' : 'Object') : drawerEdge ? 'Relationship' : 'Details'}
+          isOpen={true}
           onClose={closeDrawer}
         >
-          {drawerNode && drawerNode.data.focusedChild ? (
+          {!drawerNode && !drawerEdge ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8', textAlign: 'center', padding: 24 }}>
+              <div style={{ fontSize: 14, marginBottom: 8 }}>No selection</div>
+              <div style={{ fontSize: 13 }}>Click on a node or edge to view details</div>
+            </div>
+          ) : drawerNode && drawerNode.data.focusedChild ? (
             // Show column details when a column is focused
             (() => {
               const columnMetadata = drawerNode.data.columnsMetadata?.find(
@@ -3075,7 +3226,7 @@ function LineageCanvasInner({ onDemoModeChange }: { onDemoModeChange?: (mode: 'b
           onClose={() => setShowCatalog(false)}
           onAddNode={handleAddNodeFromCatalog}
           onAddSchema={handleAddSchemaFromCatalog}
-          onDragStart={() => console.log('Drag started from catalog')}
+          onDragStart={() => {}}
         />
 
       </div>

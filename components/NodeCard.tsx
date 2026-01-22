@@ -24,7 +24,8 @@ export type NodeCardData = {
   warning?: string | string[]; // Single warning message or array of warning messages
   children?: Array<{ name: string; type: string; selected?: boolean }>; // columns or features
   selectedChildren?: Set<string>; // Track selected column names (auto-selected by app)
-  focusedChild?: string; // Track explicitly focused column (user clicked)
+  focusedChild?: string; // Track explicitly focused column (pinned column)
+  primarySelectedColumn?: string; // The column user directly clicked (for primary styling)
   columnsMetadata?: ColumnMetadata[]; // Detailed column metadata for side panel
   brandIcon?: string; // Path to brand icon for external nodes
   onToggleUpstream?: () => void;
@@ -195,16 +196,17 @@ function TypeIcon({ type }: { type: ObjType }) {
 }
 
 function ColumnTypeIcon({ type }: { type: string }) {
-  const iconProps = { width: 16, height: 16, style: { marginRight: 4 } };
+  const iconProps = { width: 16, height: 16, style: { marginRight: 4, flexShrink: 0 } };
   
   // Normalize type to handle variations
   const normalizedType = type.toUpperCase();
   
+  // Use currentColor for all paths so CSS can control the color
   if (normalizedType.includes('VARCHAR') || normalizedType.includes('TEXT') || normalizedType.includes('STRING')) {
     return (
       <svg {...iconProps} viewBox="0 0 16 16" fill="currentColor">
-        <path d="M13 14H3V13H13V14Z" fill="#5D6A85"/>
-        <path fill-rule="evenodd" clip-rule="evenodd" d="M8 2C8.19759 2 8.37678 2.11631 8.45703 2.29688L12.3252 11H11.2305L9.89746 8H6.10254L4.76953 11H3.6748L7.54297 2.29688L7.57812 2.23242C7.66888 2.08927 7.82716 2 8 2ZM6.54688 7H9.45312L8 3.73145L6.54688 7Z" fill="#5D6A85"/>
+        <path d="M13 14H3V13H13V14Z" fill="currentColor"/>
+        <path fillRule="evenodd" clipRule="evenodd" d="M8 2C8.19759 2 8.37678 2.11631 8.45703 2.29688L12.3252 11H11.2305L9.89746 8H6.10254L4.76953 11H3.6748L7.54297 2.29688L7.57812 2.23242C7.66888 2.08927 7.82716 2 8 2ZM6.54688 7H9.45312L8 3.73145L6.54688 7Z" fill="currentColor"/>
       </svg>
     );
   }
@@ -212,7 +214,7 @@ function ColumnTypeIcon({ type }: { type: string }) {
   if (normalizedType.includes('INTEGER') || normalizedType.includes('INT') || normalizedType.includes('BIGINT') || normalizedType.includes('NUMBER')) {
     return (
       <svg {...iconProps} viewBox="0 0 16 16" fill="currentColor">
-        <path fill-rule="evenodd" clip-rule="evenodd" d="M6 5H10V2H11V5H14V6H11V10H14V11H11V14H10V11H6V14H5V11H2V10H5V6H2V5H5V2H6V5ZM6 6V10H10V6H6Z" fill="#5D6A85"/>
+        <path fillRule="evenodd" clipRule="evenodd" d="M6 5H10V2H11V5H14V6H11V10H14V11H11V14H10V11H6V14H5V11H2V10H5V6H2V5H5V2H6V5ZM6 6V10H10V6H6Z" fill="currentColor"/>
       </svg>
     );
   }
@@ -220,7 +222,7 @@ function ColumnTypeIcon({ type }: { type: string }) {
   if (normalizedType.includes('DECIMAL') || normalizedType.includes('FLOAT') || normalizedType.includes('DOUBLE') || normalizedType.includes('NUMERIC')) {
     return (
       <svg {...iconProps} viewBox="0 0 16 16" fill="currentColor">
-        <path fill-rule="evenodd" clip-rule="evenodd" d="M6 5H10V2H11V5H14V6H11V10H14V11H11V14H10V11H6V14H5V11H2V10H5V6H2V5H5V2H6V5ZM6 6V10H10V6H6Z" fill="#5D6A85"/>
+        <path fillRule="evenodd" clipRule="evenodd" d="M6 5H10V2H11V5H14V6H11V10H14V11H11V14H10V11H6V14H5V11H2V10H5V6H2V5H5V2H6V5ZM6 6V10H10V6H6Z" fill="currentColor"/>
       </svg>
     );
   }
@@ -228,8 +230,8 @@ function ColumnTypeIcon({ type }: { type: string }) {
   if (normalizedType.includes('DATE') || normalizedType.includes('TIME') || normalizedType.includes('TIMESTAMP')) {
     return (
       <svg {...iconProps} viewBox="0 0 16 16" fill="currentColor">
-        <path d="M8.5 7.5H12V8.5H8C7.72386 8.5 7.5 8.27614 7.5 8V4H8.5V7.5Z" fill="#5D6A85"/>
-        <path fill-rule="evenodd" clip-rule="evenodd" d="M8 1C11.866 1 15 4.13401 15 8C15 11.866 11.866 15 8 15C4.13401 15 1 11.866 1 8C1 4.13401 4.13401 1 8 1ZM8 2C4.68629 2 2 4.68629 2 8C2 11.3137 4.68629 14 8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2Z" fill="#5D6A85"/>
+        <path d="M8.5 7.5H12V8.5H8C7.72386 8.5 7.5 8.27614 7.5 8V4H8.5V7.5Z" fill="currentColor"/>
+        <path fillRule="evenodd" clipRule="evenodd" d="M8 1C11.866 1 15 4.13401 15 8C15 11.866 11.866 15 8 15C4.13401 15 1 11.866 1 8C1 4.13401 4.13401 1 8 1ZM8 2C4.68629 2 2 4.68629 2 8C2 11.3137 4.68629 14 8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2Z" fill="currentColor"/>
       </svg>
     );
   }
@@ -237,8 +239,8 @@ function ColumnTypeIcon({ type }: { type: string }) {
   if (normalizedType.includes('JSON') || normalizedType.includes('OBJECT') || normalizedType.includes('ARRAY')) {
     return (
       <svg {...iconProps} viewBox="0 0 16 16" fill="currentColor">
-        <path d="M6.35351 4.35352L2.70702 8L6.35351 11.6465L5.64648 12.3535L1.64648 8.35352C1.45121 8.15825 1.45121 7.84175 1.64648 7.64648L5.64648 3.64648L6.35351 4.35352Z" fill="#5D6A85"/>
-        <path d="M14.3535 7.64648C14.5487 7.84174 14.5487 8.15826 14.3535 8.35352L10.3535 12.3535L9.64648 11.6465L13.293 8L9.64648 4.35352L10.3535 3.64648L14.3535 7.64648Z" fill="#5D6A85"/>
+        <path d="M6.35351 4.35352L2.70702 8L6.35351 11.6465L5.64648 12.3535L1.64648 8.35352C1.45121 8.15825 1.45121 7.84175 1.64648 7.64648L5.64648 3.64648L6.35351 4.35352Z" fill="currentColor"/>
+        <path d="M14.3535 7.64648C14.5487 7.84174 14.5487 8.15826 14.3535 8.35352L10.3535 12.3535L9.64648 11.6465L13.293 8L9.64648 4.35352L10.3535 3.64648L14.3535 7.64648Z" fill="currentColor"/>
       </svg>
     );
   }
@@ -246,9 +248,9 @@ function ColumnTypeIcon({ type }: { type: string }) {
   if (normalizedType.includes('BOOLEAN') || normalizedType.includes('BOOL')) {
     return (
       <svg {...iconProps} viewBox="0 0 16 16" fill="currentColor">
-        <path d="M9 13L9 2.5H8L8 13H9Z" fill="#5D6A85"/>
-<path d="M13.5 3.75H12.5V4.45984C12.5 4.83022 12.3569 5.01344 12.2079 5.12074C12.0334 5.2464 11.8089 5.29318 11.6667 5.29318L11 5.29322L11.0001 6.29322L11.6667 6.29318C11.8939 6.29317 12.2001 6.24427 12.5 6.10349V10.5H11V11.5H15V10.5H13.5V3.75Z" fill="#5D6A85"/>
-<path fill-rule="evenodd" clip-rule="evenodd" d="M1 6.25C1 4.86929 2.11929 3.75 3.5 3.75C4.88071 3.75 6 4.86929 6 6.25V9.5C6 10.8807 4.88071 12 3.5 12C2.11929 12 1 10.8807 1 9.5V6.25ZM5 6.25V9.5C5 10.3284 4.32843 11 3.5 11C2.67157 11 2 10.3284 2 9.5V6.25C2 5.42157 2.67157 4.75 3.5 4.75C4.32843 4.75 5 5.42157 5 6.25Z" fill="#5D6A85"/>
+        <path d="M9 13L9 2.5H8L8 13H9Z" fill="currentColor"/>
+        <path d="M13.5 3.75H12.5V4.45984C12.5 4.83022 12.3569 5.01344 12.2079 5.12074C12.0334 5.2464 11.8089 5.29318 11.6667 5.29318L11 5.29322L11.0001 6.29322L11.6667 6.29318C11.8939 6.29317 12.2001 6.24427 12.5 6.10349V10.5H11V11.5H15V10.5H13.5V3.75Z" fill="currentColor"/>
+        <path fillRule="evenodd" clipRule="evenodd" d="M1 6.25C1 4.86929 2.11929 3.75 3.5 3.75C4.88071 3.75 6 4.86929 6 6.25V9.5C6 10.8807 4.88071 12 3.5 12C2.11929 12 1 10.8807 1 9.5V6.25ZM5 6.25V9.5C5 10.3284 4.32843 11 3.5 11C2.67157 11 2 10.3284 2 9.5V6.25C2 5.42157 2.67157 4.75 3.5 4.75C4.32843 4.75 5 5.42157 5 6.25Z" fill="currentColor"/>
       </svg>
     );
   }
@@ -256,7 +258,7 @@ function ColumnTypeIcon({ type }: { type: string }) {
   // Default icon for unknown types
   return (
     <svg {...iconProps} viewBox="0 0 16 16" fill="currentColor">
-      <path d="M8 15A7 7 0 118 1a7 7 0 010 14zM8 4a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 018 4zm0 8a1 1 0 100-2 1 1 0 000 2z" fill="#6b7280"/>
+      <path d="M8 15A7 7 0 118 1a7 7 0 010 14zM8 4a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 018 4zm0 8a1 1 0 100-2 1 1 0 000 2z" fill="currentColor"/>
     </svg>
   );
 }
@@ -829,12 +831,6 @@ export function NodeCard({ data }: { data: NodeCardData }) {
   // Hook to update node internals (handle positions) when they change
   const updateNodeInternals = useUpdateNodeInternals();
   
-  // Debug logging
-  useEffect(() => {
-    console.log('🔗 NodeCard expansion state for', data.id, ':', expansionState);
-    console.log('🔗 NodeCard debug info:', dynamicExpansion.getDebugInfo(data.id));
-  }, [data.id, expansionState, dynamicExpansion]);
-  
   // If this is a group node, render the group UI
   if (data.isGroupNode && data.groupedNodes) {
     return <GroupNodeCard data={data} />;
@@ -849,11 +845,6 @@ export function NodeCard({ data }: { data: NodeCardData }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isToolbarHovered, setIsToolbarHovered] = useState(false);
   const hoverTimeoutRef = useRef<number | null>(null);
-  const [showUpstreamMenu, setShowUpstreamMenu] = useState(false);
-  const [showDownstreamMenu, setShowDownstreamMenu] = useState(false);
-  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
-  const upstreamMenuButtonRef = useRef<HTMLButtonElement>(null);
-  const downstreamMenuButtonRef = useRef<HTMLButtonElement>(null);
   
   // Update node internals when focused child or selected children change
   // This tells ReactFlow to recalculate handle positions when columns are pinned/unpinned
@@ -893,7 +884,6 @@ export function NodeCard({ data }: { data: NodeCardData }) {
       clearTimeout(hoverTimeoutRef.current);
     }
     hoverTimeoutRef.current = setTimeout(() => {
-      console.log('Node hover START', data.id);
       setIsHovered(true);
     }, 200);
   };
@@ -904,7 +894,6 @@ export function NodeCard({ data }: { data: NodeCardData }) {
     }
     hoverTimeoutRef.current = setTimeout(() => {
       if (!isToolbarHovered) {
-        console.log('Node hover END', data.id);
         setIsHovered(false);
       }
     }, 200);
@@ -932,74 +921,14 @@ export function NodeCard({ data }: { data: NodeCardData }) {
   // Determine if toolbars should be visible
   const showToolbars = isHovered || isToolbarHovered || data.selected;
 
-  // Handle overflow menu clicks
-  const handleUpstreamMenuClick = () => {
-    console.log('🔵 Upstream menu button clicked', showUpstreamMenu);
-    
-    // Select this node when opening the menu
-    if (!showUpstreamMenu && data.onSelectNode) {
-      data.onSelectNode();
-    }
-    
-    if (upstreamMenuButtonRef.current) {
-      const rect = upstreamMenuButtonRef.current.getBoundingClientRect();
-      console.log('🔵 Menu position:', rect);
-      setMenuPosition({
-        top: rect.bottom + 4,
-        left: rect.left,
-      });
-    }
-    setShowUpstreamMenu(!showUpstreamMenu);
-    setShowDownstreamMenu(false);
-  };
-
-  const handleDownstreamMenuClick = () => {
-    console.log('🔴 Downstream menu button clicked', showDownstreamMenu);
-    
-    // Select this node when opening the menu
-    if (!showDownstreamMenu && data.onSelectNode) {
-      data.onSelectNode();
-    }
-    
-    if (downstreamMenuButtonRef.current) {
-      const rect = downstreamMenuButtonRef.current.getBoundingClientRect();
-      console.log('🔴 Menu position:', rect);
-      setMenuPosition({
-        top: rect.bottom + 4,
-        left: rect.left,
-      });
-    }
-    setShowDownstreamMenu(!showDownstreamMenu);
-    setShowUpstreamMenu(false);
-  };
-
-  // Close menus when clicking outside
-  useEffect(() => {
-    const handleClickOutside = () => {
-      if (showUpstreamMenu || showDownstreamMenu) {
-        setShowUpstreamMenu(false);
-        setShowDownstreamMenu(false);
-      }
-    };
-    
-    if (showUpstreamMenu || showDownstreamMenu) {
-      document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
-    }
-  }, [showUpstreamMenu, showDownstreamMenu]);
-
   const handleDoubleClick = () => {
-    console.log('Double click detected'); // Debug log
-    
     if (isAutoExpanded) {
       // If already auto-expanded, return to default height
       setChildrenListHeight(206);
       setIsAutoExpanded(false);
-      console.log('Collapsed to default height');
     } else {
       // Auto-expand to show all children
       setIsAutoExpanded(true);
-      console.log('Auto-expanded to show all children');
     }
   };
 
@@ -1025,8 +954,6 @@ export function NodeCard({ data }: { data: NodeCardData }) {
       return;
     }
 
-    console.log('Drag start triggered'); // Debug log
-    
     // Prevent all possible event propagation
     e.preventDefault();
     e.stopPropagation();
@@ -1066,16 +993,12 @@ export function NodeCard({ data }: { data: NodeCardData }) {
       // Exit auto-expanded mode when user starts dragging
       if (isAutoExpanded) {
         setIsAutoExpanded(false);
-        console.log('Exited auto-expanded mode due to drag');
       }
       
       setChildrenListHeight(newHeight);
-      console.log('Resizing to:', newHeight); // Debug log
     };
 
     const handleDragEnd = (e: PointerEvent | MouseEvent) => {
-      console.log('Drag end triggered'); // Debug log
-      
       e.preventDefault();
       e.stopPropagation();
       if ('stopImmediatePropagation' in e) {
@@ -1122,25 +1045,9 @@ export function NodeCard({ data }: { data: NodeCardData }) {
           onMouseEnter={handleToolbarMouseEnter}
           onMouseLeave={handleToolbarMouseLeave}
         >
-          <div ref={upstreamMenuButtonRef as any}>
-            <IconButton
-              aria-label="Upstream actions"
-              onClick={handleUpstreamMenuClick}
-              size="sm"
-              variant="icon"
-              level="nodecard"
-            >
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-                <circle cx="3" cy="8" r="1.5" />
-                <circle cx="8" cy="8" r="1.5" />
-                <circle cx="13" cy="8" r="1.5" />
-              </svg>
-            </IconButton>
-          </div>
           <IconButton
             aria-label="Toggle upstream"
             onClick={() => {
-              console.log('🔵 Upstream button clicked', data.id, expansionState.upstreamExpanded);
               data.onToggleUpstream?.();
             }}
             size="sm"
@@ -1169,7 +1076,6 @@ export function NodeCard({ data }: { data: NodeCardData }) {
           <IconButton
             aria-label="Toggle downstream"
             onClick={() => {
-              console.log('🔴 Downstream button clicked', data.id, expansionState.downstreamExpanded);
               data.onToggleDownstream?.();
             }}
             size="sm"
@@ -1179,21 +1085,6 @@ export function NodeCard({ data }: { data: NodeCardData }) {
           >
             {expansionState.downstreamExpanded ? <MinusIcon /> : <PlusIcon />}
           </IconButton>
-          <div ref={downstreamMenuButtonRef as any}>
-            <IconButton
-              aria-label="Downstream actions"
-              onClick={handleDownstreamMenuClick}
-              size="sm"
-              variant="icon"
-              level="nodecard"
-            >
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-                <circle cx="3" cy="8" r="1.5" />
-                <circle cx="8" cy="8" r="1.5" />
-                <circle cx="13" cy="8" r="1.5" />
-              </svg>
-            </IconButton>
-          </div>
         </div>
       </NodeToolbar>
 
@@ -1345,10 +1236,13 @@ export function NodeCard({ data }: { data: NodeCardData }) {
             
             if (!pinnedChild) return null;
             
+            // Check if this pinned column is the primary selection (user clicked)
+            const isPinnedPrimary = data.primarySelectedColumn === pinnedChild.name;
+            
             return (
               <div className="pinned-column-section">
                 <div 
-                  className="child-item selected pinned focused"
+                  className={`child-item selected pinned focused ${isPinnedPrimary ? 'primary' : ''}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     // Clicking pinned column deselects it
@@ -1389,7 +1283,8 @@ export function NodeCard({ data }: { data: NodeCardData }) {
           <div 
             className="children-list nopan nodrag"
             style={{ 
-              maxHeight: isAutoExpanded ? 'none' : `${childrenListHeight}px`,
+              // Reduce height by 28px when pinned column exists to keep card size constant
+              maxHeight: isAutoExpanded ? 'none' : `${data.focusedChild ? childrenListHeight - 26 : childrenListHeight}px`,
               overflow: isAutoExpanded ? 'visible' : 'auto',
               overflowY: isAutoExpanded ? 'visible' : 'auto'
             }}
@@ -1410,14 +1305,14 @@ export function NodeCard({ data }: { data: NodeCardData }) {
               .map((child, index) => {
                 const isSelected = data.selectedChildren?.has(child.name) || false;
                 const isFocused = data.focusedChild === child.name;
-                const isPrimarySelection = data.selectedChildren?.has(child.name) && 
-                  data.selectedChildren?.size === 1; // Only this column is selected in this node
+                // Primary selection is the column user directly clicked
+                const isPrimarySelection = data.primarySelectedColumn === child.name;
                 const isRelatedColumn = isSelected && !isPrimarySelection;
               
               return (
                 <div 
                   key={index} 
-                  className={`child-item ${isSelected ? 'selected' : ''} ${isFocused ? 'focused' : ''} ${isRelatedColumn ? 'related' : ''}`}
+                  className={`child-item ${isSelected ? 'selected' : ''} ${isPrimarySelection ? 'primary' : ''} ${isFocused ? 'focused' : ''} ${isRelatedColumn ? 'related' : ''}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     // First handle selection for lineage - this will replace the currently selected column
@@ -1514,68 +1409,6 @@ export function NodeCard({ data }: { data: NodeCardData }) {
       />
       </div>
 
-      {/* Overflow Menu Popovers */}
-      {showUpstreamMenu && createPortal(
-        <div
-          className="overflow-menu popover-base"
-          style={{
-            position: 'fixed',
-            top: `${menuPosition.top}px`,
-            left: `${menuPosition.left}px`,
-            transform: 'none',
-            zIndex: 9999,
-            minWidth: '180px',
-            pointerEvents: 'auto',
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div 
-            className="overflow-menu-item"
-            onClick={() => {
-              console.log('Search upstream nodes', data.id);
-              setShowUpstreamMenu(false);
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: 8 }}>
-              <circle cx="7" cy="7" r="5" stroke="currentColor" fill="none" strokeWidth="1.5"/>
-              <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-            Search upstream nodes
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {showDownstreamMenu && createPortal(
-        <div
-          className="overflow-menu popover-base"
-          style={{
-            position: 'fixed',
-            top: `${menuPosition.top}px`,
-            left: `${menuPosition.left}px`,
-            transform: 'none',
-            zIndex: 9999,
-            minWidth: '180px',
-            pointerEvents: 'auto',
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div 
-            className="overflow-menu-item"
-            onClick={() => {
-              console.log('Search downstream nodes', data.id);
-              setShowDownstreamMenu(false);
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style={{ marginRight: 8 }}>
-              <circle cx="7" cy="7" r="5" stroke="currentColor" fill="none" strokeWidth="1.5"/>
-              <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-            Search downstream nodes
-          </div>
-        </div>,
-        document.body
-      )}
     </>
   );
 }

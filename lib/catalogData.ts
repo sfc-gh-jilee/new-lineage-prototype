@@ -46,22 +46,6 @@ function n(
   const formattedLabel = label.toUpperCase();
   const fullPath = `${db}.${schema}.${formattedLabel}`;
   
-  // Debug logging for models
-  if (objType === 'MODEL') {
-    console.log('🔍 Model node (v3):', { 
-      id, 
-      objType, 
-      hasMetadata: !!metadata, 
-      hasFeatures: !!metadata?.features, 
-      features: metadata?.features,
-      metadataKeys: metadata ? Object.keys(metadata) : [],
-      willUseFeatures: !!(objType === 'MODEL' && metadata && metadata.features),
-      childrenWillBe: objType === 'MODEL' && metadata && metadata.features 
-        ? metadata.features.map(feature => ({ name: feature, type: 'feature' }))
-        : cols.map(col => ({ name: col.name, type: col.type }))
-    });
-  }
-  
   return {
     id,
     name: fullPath, // Full path for display in node card header

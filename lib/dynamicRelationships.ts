@@ -21,12 +21,10 @@ export class DynamicRelationshipManager {
   // Add a node to the manager
   addNode(node: LineageNode): void {
     this.allNodes.set(node.id, node);
-    console.log('🔗 DynamicRelationshipManager: Added node', node.id, node.label);
   }
 
   // Add multiple nodes at once
   addNodes(nodes: LineageNode[]): void {
-    console.log('🔗 DynamicRelationshipManager: Adding', nodes.length, 'nodes');
     nodes.forEach(node => {
       this.addNode(node);
     });
@@ -35,12 +33,10 @@ export class DynamicRelationshipManager {
   // Add an edge to the manager
   addEdge(edge: LineageEdge): void {
     this.allEdges.set(edge.id, edge);
-    console.log('🔗 DynamicRelationshipManager: Added edge', edge.id, edge.source, '->', edge.target);
   }
 
   // Add multiple edges at once
   addEdges(edges: LineageEdge[]): void {
-    console.log('🔗 DynamicRelationshipManager: Adding', edges.length, 'edges');
     edges.forEach(edge => {
       this.addEdge(edge);
     });
@@ -49,7 +45,6 @@ export class DynamicRelationshipManager {
   // Set visible nodes (nodes currently in the graph)
   setVisibleNodes(nodeIds: Set<string>): void {
     this.visibleNodes = new Set(nodeIds);
-    console.log('🔗 DynamicRelationshipManager: Set visible nodes', Array.from(nodeIds));
   }
 
   // Find node by various reference formats (ID, name, label, path)
@@ -98,11 +93,9 @@ export class DynamicRelationshipManager {
   getUpstreamNodes(nodeId: string): LineageNode[] {
     const node = this.allNodes.get(nodeId);
     if (!node) {
-      console.log('🔗 getUpstreamNodes: Node not found', nodeId);
       return [];
     }
 
-    console.log('🔗 getUpstreamNodes: Finding upstream for', nodeId, node.label);
     const upstreamNodes: LineageNode[] = [];
     const processed = new Set<string>();
 
@@ -114,16 +107,12 @@ export class DynamicRelationshipManager {
       const currentNode = this.allNodes.get(currentNodeId);
       if (!currentNode) return;
 
-      console.log('🔗 findUpstream: Processing node', currentNodeId, currentNode.label);
-
       // Check metadata for upstream references
       const nodeWithMetadata = currentNode as any;
       if (nodeWithMetadata.metadata?.upstreamReferences) {
-        console.log('🔗 findUpstream: Found metadata upstream references', nodeWithMetadata.metadata.upstreamReferences);
         nodeWithMetadata.metadata.upstreamReferences.forEach((ref: string) => {
           const upstreamNode = this.findNodeByReference(ref);
           if (upstreamNode && !upstreamNodes.some(n => n.id === upstreamNode.id)) {
-            console.log('🔗 findUpstream: Added upstream node from metadata', upstreamNode.id, upstreamNode.label);
             upstreamNodes.push(upstreamNode);
             findUpstream(upstreamNode.id); // Recursively find more upstream
           }
@@ -132,13 +121,11 @@ export class DynamicRelationshipManager {
 
       // Check column lineage for upstream references
       if (nodeWithMetadata.metadata?.columnLineage) {
-        console.log('🔗 findUpstream: Found column lineage metadata');
         Object.values(nodeWithMetadata.metadata.columnLineage).forEach((columnLineage: any) => {
           if (columnLineage.upstreamColumns) {
             columnLineage.upstreamColumns.forEach((upstreamCol: string) => {
               const upstreamNode = this.findNodeByColumnReference(upstreamCol);
               if (upstreamNode && !upstreamNodes.some(n => n.id === upstreamNode.id)) {
-                console.log('🔗 findUpstream: Added upstream node from column lineage', upstreamNode.id, upstreamNode.label);
                 upstreamNodes.push(upstreamNode);
                 findUpstream(upstreamNode.id);
               }
@@ -148,12 +135,10 @@ export class DynamicRelationshipManager {
       }
 
       // Check edges for upstream connections
-      console.log('🔗 findUpstream: Checking edges for upstream connections');
       for (const edge of this.allEdges.values()) {
         if (edge.target === currentNodeId) {
           const upstreamNode = this.allNodes.get(edge.source);
           if (upstreamNode && !upstreamNodes.some(n => n.id === upstreamNode.id)) {
-            console.log('🔗 findUpstream: Added upstream node from edge', upstreamNode.id, upstreamNode.label, 'via edge', edge.id);
             upstreamNodes.push(upstreamNode);
             findUpstream(upstreamNode.id);
           }
@@ -162,7 +147,6 @@ export class DynamicRelationshipManager {
     };
 
     findUpstream(nodeId);
-    console.log('🔗 getUpstreamNodes: Final result for', nodeId, ':', upstreamNodes.map(n => n.id));
     return upstreamNodes;
   }
 
@@ -378,11 +362,7 @@ export class DynamicRelationshipManager {
     if (!node) return;
 
     // Update the node's expansion flags based on current state
-    const expansionState = this.getExpansionState(nodeId);
-    
     // This would typically update the node in the graph state
-    // For now, we'll just log the state
-    console.log('🔗 DynamicRelationshipManager: Updated expansion state for', nodeId, expansionState);
   }
 
   // Get debug information about relationships

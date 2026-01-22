@@ -63,7 +63,6 @@ export function CatalogPanel({ isOpen, onClose, onAddNode, onAddSchema, onDragSt
   };
 
   const handleDragStart = (node: LineageNode, e: React.DragEvent) => {
-    console.log('Drag started:', node.id);
     e.dataTransfer.setData('application/reactflow', JSON.stringify(node));
     e.dataTransfer.effectAllowed = 'copy';
     
@@ -75,7 +74,6 @@ export function CatalogPanel({ isOpen, onClose, onAddNode, onAddSchema, onDragSt
   };
   
   const handleDragEnd = () => {
-    console.log('Drag ended');
     setIsDragging(false);
   };
 
